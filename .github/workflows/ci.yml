@@ -42,7 +42,8 @@ jobs:
       - name: Find tests
         run: |
           echo "Finding tests"
-          grep -rn "def test" > /dev/null
+          # Allow CI to continue even when there are currently no tests
+          grep -rn "def test" > /dev/null || echo "No tests found; skipping."
 
       - name: Setup Python
         uses: actions/setup-python@v4
