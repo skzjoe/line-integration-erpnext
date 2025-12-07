@@ -7,7 +7,7 @@ import re
 import frappe
 from frappe.utils import now_datetime
 
-from line_integration.line_integration.utils.line_client import (
+from line_integration.utils.line_client import (
     ensure_profile,
     get_settings,
     reply_message,
