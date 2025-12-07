@@ -1,5 +1,6 @@
 {
   "name": "LINE Profile",
+  "doctype": "DocType",
   "module": "Line Integration",
   "custom": 0,
   "is_single": 0,
