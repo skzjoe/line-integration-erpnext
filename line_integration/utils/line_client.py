@@ -3,6 +3,7 @@ import json
 import requests
 import frappe
 from frappe.utils import now_datetime
+from frappe.utils.password import get_decrypted_password
 
 
 def get_settings():
@@ -20,7 +21,10 @@ def reply_message(reply_token, text):
     if not reply_token:
         return
     settings = get_settings()
-    if not settings.enabled or not settings.channel_access_token:
+    if not settings.enabled:
+        return
+    access_token = get_decrypted_password("LINE Settings", "LINE Settings", "channel_access_token") or ""
+    if not access_token:
         return
     url = "https://api.line.me/v2/bot/message/reply"
     payload = {"replyToken": reply_token, "messages": [{"type": "text", "text": text}]}
@@ -28,7 +32,7 @@ def reply_message(reply_token, text):
         requests.post(
             url,
             data=json.dumps(payload),
-            headers=_headers(settings.channel_access_token),
+            headers=_headers(access_token),
             timeout=10,
         )
     except Exception:
@@ -39,7 +43,10 @@ def push_message(user_id, text):
     if not user_id:
         return
     settings = get_settings()
-    if not settings.enabled or not settings.channel_access_token:
+    if not settings.enabled:
+        return
+    access_token = get_decrypted_password("LINE Settings", "LINE Settings", "channel_access_token") or ""
+    if not access_token:
         return
     url = "https://api.line.me/v2/bot/message/push"
     payload = {"to": user_id, "messages": [{"type": "text", "text": text}]}
@@ -47,7 +54,7 @@ def push_message(user_id, text):
         requests.post(
             url,
             data=json.dumps(payload),
-            headers=_headers(settings.channel_access_token),
+            headers=_headers(access_token),
             timeout=10,
         )
     except Exception:

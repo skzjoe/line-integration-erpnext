@@ -6,6 +6,7 @@ import re
 
 import frappe
 from frappe.utils import now_datetime
+from frappe.utils.password import get_decrypted_password
 
 from line_integration.utils.line_client import (
     ensure_profile,
@@ -35,13 +36,15 @@ def line_webhook():
         }
     )
 
-    if not signature or not settings.channel_secret:
+    # password field; use decrypted secret
+    channel_secret = get_decrypted_password("LINE Settings", "LINE Settings", "channel_secret")
+    if not signature or not channel_secret:
         logger.warning("Missing signature or channel secret")
         frappe.local.response.http_status_code = 400
         return "Missing signature or channel secret"
 
     digest = hmac.new(
-        settings.channel_secret.encode("utf-8"), raw_body, hashlib.sha256
+        channel_secret.encode("utf-8"), raw_body, hashlib.sha256
     ).digest()
     expected_signature = base64.b64encode(digest).decode()
 
