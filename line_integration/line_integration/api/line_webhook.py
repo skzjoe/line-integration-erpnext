@@ -223,3 +223,9 @@ def save_state(user_id, state):
 
 def clear_state(user_id):
     frappe.cache().delete_value(cache_key(user_id))
+
+
+@frappe.whitelist(allow_guest=True)
+def ping():
+    """Simple health check to confirm module is loaded."""
+    return "pong"
