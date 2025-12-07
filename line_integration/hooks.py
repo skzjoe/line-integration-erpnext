@@ -7,7 +7,7 @@ app_license = "mit"
 
 doc_events = {
 	"Delivery Note": {
-		"on_submit": "line_integration.events.delivery_note.send_line_notification"
+		"on_submit": "line_integration.line_integration.events.delivery_note.send_line_notification"
 	}
 }
 

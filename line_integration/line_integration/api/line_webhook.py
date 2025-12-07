@@ -7,7 +7,11 @@ import re
 import frappe
 from frappe.utils import now_datetime
 
-from line_integration.utils.line_client import ensure_profile, get_settings, reply_message
+from line_integration.line_integration.utils.line_client import (
+    ensure_profile,
+    get_settings,
+    reply_message,
+)
 
 REGISTER_PROMPT = "Please tell us your name to get started."
 ASK_PHONE_PROMPT = "Thanks! Now please send your 10-digit phone number."
