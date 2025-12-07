@@ -18,10 +18,21 @@ PHONE_REGEX = re.compile(r"^\\d{10}$")
 def line_webhook():
     """LINE webhook endpoint."""
     raw_body = frappe.request.get_data() or b""
+    logger = frappe.logger("line_webhook")
     settings = get_settings()
     signature = frappe.get_request_header("X-Line-Signature")
 
+    logger.info(
+        {
+            "event": "line_webhook_received",
+            "has_signature": bool(signature),
+            "body_len": len(raw_body),
+            "path": frappe.request.path,
+        }
+    )
+
     if not signature or not settings.channel_secret:
+        logger.warning("Missing signature or channel secret")
         frappe.local.response.http_status_code = 400
         return "Missing signature or channel secret"
 
@@ -31,6 +42,7 @@ def line_webhook():
     expected_signature = base64.b64encode(digest).decode()
 
     if not hmac.compare_digest(expected_signature, signature):
+        logger.warning("Invalid signature")
         frappe.local.response.http_status_code = 400
         return "Invalid signature"
 
