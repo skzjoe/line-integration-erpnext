@@ -5,17 +5,21 @@ import json
 import re
 
 import frappe
-from frappe.utils import now_datetime
+from frappe.utils import now_datetime, today
 
 from line_integration.utils.line_client import (
     ensure_profile,
     get_settings,
     reply_message,
 )
+from erpnext.selling.doctype.loyalty_program.loyalty_program import get_loyalty_points
 
 REGISTER_PROMPT = "สวัสดีค่า! เพื่อทำการลงทะเบียน กรุณาส่งชื่อที่ต้องการใช้งานมาให้เราค่ะ"
 ASK_PHONE_PROMPT = "ขอบคุณค่า! ตอนนี้กรุณาส่งหมายเลขโทรศัพท์ 10 หลักของคุณ (ไม่มีขีดหรือตัวอักษรอื่นๆ) มาให้เราค่ะ"
 ALREADY_REGISTERED_MSG = "สวัสดีค่าคุณ {name} คุณได้ทำการสมัครสมาชิกไปเรียบร้อยแล้ว"
+CHECK_POINTS_KEY = "ตรวจสอบpointคงเหลือ"
+LOYALTY_PROGRAM = "Wellie Point"
+REGISTER_KEYWORDS = {"register", "สมัครสมาชิก", "สมาชิก"}
 PHONE_REGEX = re.compile(r"^\d{10}$")
 
 
@@ -103,6 +107,10 @@ def handle_event(event):
         if message.get("type") == "text":
             text = (message.get("text") or "").strip()
             lower = text.lower()
+            normalized = "".join(lower.split())
+            if normalized == CHECK_POINTS_KEY:
+                reply_points(profile_doc, event.get("replyToken"))
+                return
             if state and state.get("stage") == "awaiting_name":
                 save_state(user_id, {"stage": "awaiting_phone", "name": text})
                 reply_message(event.get("replyToken"), ASK_PHONE_PROMPT)
@@ -119,12 +127,9 @@ def handle_event(event):
                         "กรุณาส่งหมายเลขโทรศัพท์ 10 หลักของคุณ (ไม่มีขีดหรือตัวอักษรอื่นๆ).",
                     )
                 return
-            if lower == "register":
+            if normalized in REGISTER_KEYWORDS:
                 if profile_doc.customer:
-                    reply_message(
-                        event.get("replyToken"),
-                        ALREADY_REGISTERED_MSG.format(name=profile_doc.customer),
-                    )
+                    reply_registered_flex(profile_doc, event.get("replyToken"))
                     return
                 clear_state(user_id)
                 save_state(user_id, {"stage": "awaiting_name"})
@@ -150,6 +155,88 @@ def link_customer(profile_doc, phone_number, reply_token):
         reply_message(reply_token, f"Linked to customer {customer_name}. Thank you!")
     else:
         reply_message(reply_token, "Customer not found. Please contact support.")
+
+
+def reply_points(profile_doc, reply_token):
+    if not profile_doc.customer:
+        reply_message(
+            reply_token,
+            "ยังไม่มีข้อมูลสมาชิก กรุณาพิมพ์ register เพื่อเริ่มลงทะเบียนค่ะ",
+        )
+        return
+
+    try:
+        customer_name = profile_doc.customer
+        display_name = (
+            frappe.db.get_value("Customer", customer_name, "customer_name") or customer_name
+        )
+        result = get_loyalty_points(
+            customer=customer_name,
+            loyalty_program=LOYALTY_PROGRAM,
+            posting_date=today(),
+        ) or {}
+        points = result.get("loyalty_points", 0) or 0
+        reply_message(
+            reply_token,
+            f"คุณ {display_name} มี Wellie Point คงเหลือ {points} แต้ม",
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "LINE Points Check Error")
+        reply_message(
+            reply_token,
+            "ขออภัย ไม่สามารถตรวจสอบคะแนนได้ในขณะนี้ กรุณาลองใหม่อีกครั้งค่ะ",
+        )
+
+
+def reply_registered_flex(profile_doc, reply_token):
+    customer = profile_doc.customer
+    details = frappe.db.get_value(
+        "Customer",
+        customer,
+        ["customer_name", "mobile_no"],
+        as_dict=True,
+    ) if customer else None
+
+    display_name = (details and details.get("customer_name")) or customer or "สมาชิก"
+    phone = (details and details.get("mobile_no")) or "-"
+
+    flex = {
+        "type": "flex",
+        "altText": "ข้อมูลสมาชิก",
+        "contents": {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {"type": "text", "text": "สมาชิก", "weight": "bold", "size": "lg"},
+                    {"type": "text", "text": display_name, "size": "md", "margin": "sm"},
+                    {"type": "text", "text": f"เบอร์: {phone}", "size": "sm", "color": "#555555", "margin": "sm"},
+                ],
+                "spacing": "md",
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "primary",
+                        "color": "#22bb33",
+                        "action": {"type": "message", "label": "เช็คคะแนนคงเหลือ", "text": "ตรวจสอบ Point คงเหลือ"},
+                    },
+                    {
+                        "type": "button",
+                        "style": "secondary",
+                        "action": {"type": "message", "label": "สั่งออเดอร์", "text": "สั่งออเดอร์"},
+                    },
+                ],
+            },
+        },
+    }
+
+    reply_message(reply_token, flex)
 
 
 def register_customer(profile_doc, full_name, phone_number, reply_token):

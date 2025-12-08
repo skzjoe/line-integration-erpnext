@@ -17,7 +17,7 @@ def _headers(token):
     }
 
 
-def reply_message(reply_token, text):
+def reply_message(reply_token, content):
     if not reply_token:
         return
     settings = get_settings()
@@ -27,7 +27,16 @@ def reply_message(reply_token, text):
     if not access_token:
         return
     url = "https://api.line.me/v2/bot/message/reply"
-    payload = {"replyToken": reply_token, "messages": [{"type": "text", "text": text}]}
+    messages = []
+    if isinstance(content, str):
+        messages = [{"type": "text", "text": content}]
+    elif isinstance(content, dict):
+        messages = [content]
+    elif isinstance(content, (list, tuple)):
+        messages = list(content)
+    else:
+        return
+    payload = {"replyToken": reply_token, "messages": messages}
     try:
         requests.post(
             url,
