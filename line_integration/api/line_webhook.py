@@ -85,6 +85,7 @@ def line_webhook():
 
 
 def handle_event(event, settings):
+    logger = frappe.logger("line_webhook")
     event_type = event.get("type")
     source = event.get("source") or {}
     user_id = source.get("userId")
@@ -125,6 +126,19 @@ def handle_event(event, settings):
                 settings.already_registered_message or DEFAULT_ALREADY_REGISTERED_MSG
             )
             order_reply_msg = settings.order_reply_message or DEFAULT_ORDER_REPLY
+
+            logger.info(
+                {
+                    "event": "line_keyword_check",
+                    "user_id": user_id,
+                    "text": text,
+                    "normalized": normalized,
+                    "register_keywords": register_keywords,
+                    "points_keywords": points_keywords,
+                    "menu_keywords": menu_keywords,
+                    "order_keywords": order_keywords,
+                }
+            )
 
             if normalized in points_keywords["normalized"]:
                 reply_points(profile_doc, event.get("replyToken"))
