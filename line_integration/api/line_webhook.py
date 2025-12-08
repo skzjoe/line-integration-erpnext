@@ -77,14 +77,14 @@ def line_webhook():
 
     for event in events:
         try:
-            handle_event(event)
+            handle_event(event, settings)
         except Exception:
             frappe.log_error(frappe.get_traceback(), "LINE Webhook Error")
 
     return "OK"
 
 
-def handle_event(event):
+def handle_event(event, settings):
     event_type = event.get("type")
     source = event.get("source") or {}
     user_id = source.get("userId")
