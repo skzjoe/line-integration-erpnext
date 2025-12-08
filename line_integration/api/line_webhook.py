@@ -12,7 +12,6 @@ from line_integration.utils.line_client import (
     get_settings,
     reply_message,
 )
-from erpnext.selling.doctype.loyalty_program.loyalty_program import get_loyalty_points
 
 REGISTER_PROMPT = "สวัสดีค่า! เพื่อทำการลงทะเบียน กรุณาส่งชื่อที่ต้องการใช้งานมาให้เราค่ะ"
 ASK_PHONE_PROMPT = "ขอบคุณค่า! ตอนนี้กรุณาส่งหมายเลขโทรศัพท์ 10 หลักของคุณ (ไม่มีขีดหรือตัวอักษรอื่นๆ) มาให้เราค่ะ"
@@ -166,16 +165,33 @@ def reply_points(profile_doc, reply_token):
         return
 
     try:
+        try:
+            from erpnext.accounts.doctype.loyalty_program.loyalty_program import (
+                get_loyalty_points,
+                get_loyalty_program_details_with_points,
+            )
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                "LINE Points Check Error: import erpnext.accounts.loyalty_program",
+            )
+            reply_message(
+                reply_token,
+                "ขออภัย ไม่สามารถตรวจสอบคะแนนได้ในขณะนี้ กรุณาลองใหม่อีกครั้งค่ะ",
+            )
+            return
+
         customer_name = profile_doc.customer
         display_name = (
             frappe.db.get_value("Customer", customer_name, "customer_name") or customer_name
         )
-        result = get_loyalty_points(
+        lp_details = get_loyalty_program_details_with_points(
             customer=customer_name,
             loyalty_program=LOYALTY_PROGRAM,
+            company=frappe.db.get_default("company"),
             posting_date=today(),
-        ) or {}
-        points = result.get("loyalty_points", 0) or 0
+        )
+        points = (lp_details or {}).get("loyalty_points", 0) or 0
         reply_message(
             reply_token,
             f"คุณ {display_name} มี Wellie Point คงเหลือ {points} แต้ม",
