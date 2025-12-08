@@ -167,7 +167,6 @@ def reply_points(profile_doc, reply_token):
     try:
         try:
             from erpnext.accounts.doctype.loyalty_program.loyalty_program import (
-                get_loyalty_points,
                 get_loyalty_program_details_with_points,
             )
         except Exception:
