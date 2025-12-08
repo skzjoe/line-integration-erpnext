@@ -373,7 +373,7 @@ def reply_order_form(reply_token, settings):
             subtitle="กรอกจำนวนแล้วส่งกลับได้เลย",
             body_contents=body_contents,
         )
-        flex_msg = {"type": "flex", "altText": "ฟอร์มสั่งออเดอร์", "contents": flex_msg["contents"]}
+        flex_msg = {"type": "flex", "altText": "ฟอร์มสั่งออเดอร์", "contents": flex_msg}
 
         text_msg = (
             "คัดลอกข้อความนี้ แก้ไขจำนวน/หมายเหตุ แล้วส่งกลับได้เลย\n"
