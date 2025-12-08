@@ -257,12 +257,7 @@ def reply_points(profile_doc, reply_token):
 def reply_menu(reply_token, settings):
     logger = frappe.logger("line_webhook")
     try:
-        items = frappe.get_all(
-            "Item",
-            filters={"custom_add_in_line_menu": 1},
-            fields=["name", "item_name", "description", "custom_line_menu_image"],
-            limit=10,
-        )
+        items = fetch_menu_items(limit=10)
         menu_info = {"event": "line_menu_build", "items": len(items)}
         logger.info(menu_info)
         if not items:
@@ -277,95 +272,17 @@ def reply_menu(reply_token, settings):
         summary_image_url = resolve_public_image_url(summary_image, logger)
 
         bubbles = []
-        # Optional summary bubble goes first
         if summary_image_url:
-            summary_bubble = {
-                "type": "bubble",
-                "hero": {
-                    "type": "image",
-                    "url": summary_image_url,
-                    "size": "full",
-                    "aspectRatio": "20:13",
-                    "aspectMode": "cover",
-                    "action": {"type": "uri", "label": "ดูภาพ", "uri": summary_image_url},
-                },
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "text",
-                            "text": "เมนูวันนี้",
-                            "weight": "bold",
-                            "size": "lg",
-                        },
-                        {
-                            "type": "text",
-                            "text": "เลือกดูเมนูหรือคัดลอกฟอร์มสั่งออเดอร์แล้วส่งกลับได้เลยค่ะ",
-                            "size": "sm",
-                            "color": "#555555",
-                            "wrap": True,
-                            "margin": "sm",
-                        },
-                    ],
-                    "spacing": "md",
-                },
-            }
-            bubbles.append(summary_bubble)
+            bubbles.append(
+                build_summary_bubble(
+                    summary_image_url,
+                    title="เมนูวันนี้",
+                    subtitle="เลือกดูเมนูหรือคัดลอกฟอร์มสั่งออเดอร์แล้วส่งกลับได้เลยค่ะ",
+                )
+            )
 
         for item in items:
-            title = item.item_name or item.name
-            desc = (item.description or "").strip()
-            if len(desc) > 120:
-                desc = desc[:117] + "..."
-            image_url = resolve_public_image_url(item.custom_line_menu_image, logger)
-
-            body_contents = [
-                {"type": "text", "text": title, "weight": "bold", "size": "md", "wrap": True},
-            ]
-            if desc:
-                body_contents.append(
-                    {"type": "text", "text": desc, "size": "sm", "color": "#555555", "wrap": True}
-                )
-
-            bubble = {
-                "type": "bubble",
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "md",
-                    "contents": body_contents,
-                },
-                "footer": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "sm",
-                    "contents": [
-                        {
-                            "type": "button",
-                            "style": "primary",
-                            "color": "#22bb33",
-                            "action": {
-                                "type": "message",
-                                "label": "สั่งออเดอร์",
-                                # Send simple trigger; system will reply with form
-                                "text": "สั่งออเดอร์",
-                            },
-                        }
-                    ],
-                },
-            }
-            if image_url:
-                bubble["hero"] = {
-                    "type": "image",
-                    "url": image_url,
-                    "size": "full",
-                    "aspectRatio": "1:1",
-                    "aspectMode": "cover",
-                    "action": {"type": "uri", "label": "ดูภาพ", "uri": image_url},
-                }
-
-            bubbles.append(bubble)
+            bubbles.append(build_item_bubble(item, logger))
 
         menu_carousel = {
             "type": "flex",
@@ -401,12 +318,7 @@ def reply_order_form(reply_token, settings):
     """Send a single flex message with form template for user to fill quantities."""
     logger = frappe.logger("line_webhook")
     try:
-        items = frappe.get_all(
-            "Item",
-            filters={"custom_add_in_line_menu": 1},
-            fields=["name", "item_name"],
-            limit=20,
-        )
+        items = fetch_menu_items(limit=20)
         template_lines = ["สั่งออเดอร์"]
         for idx, item in enumerate(items or [], start=1):
             title = item.item_name or item.name
@@ -421,17 +333,7 @@ def reply_order_form(reply_token, settings):
         )
         summary_image_url = resolve_public_image_url(summary_image, logger)
 
-        body_contents = [
-            {"type": "text", "text": "ฟอร์มสั่งออเดอร์", "weight": "bold", "size": "lg"},
-            {
-                "type": "text",
-                "text": "กรอกจำนวนแล้วส่งกลับได้เลย",
-                "size": "sm",
-                "color": "#555555",
-                "wrap": True,
-                "margin": "sm",
-            },
-        ]
+        body_contents = []
         if items:
             body_contents.append(
                 {
@@ -465,31 +367,13 @@ def reply_order_form(reply_token, settings):
                 }
             )
 
-        bubble = {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "md",
-                "contents": body_contents,
-            },
-            # Footer intentionally omitted to avoid auto-send/share; instructions are in text message below
-        }
-        if summary_image_url:
-            bubble["hero"] = {
-                "type": "image",
-                "url": summary_image_url,
-                "size": "full",
-                "aspectRatio": "20:13",
-                "aspectMode": "cover",
-                "action": {"type": "uri", "label": "ดูภาพ", "uri": summary_image_url},
-            }
-
-        flex_msg = {
-            "type": "flex",
-            "altText": "ฟอร์มสั่งออเดอร์",
-            "contents": bubble,
-        }
+        flex_msg = build_summary_bubble(
+            summary_image_url,
+            title="ฟอร์มสั่งออเดอร์",
+            subtitle="กรอกจำนวนแล้วส่งกลับได้เลย",
+            body_contents=body_contents,
+        )
+        flex_msg = {"type": "flex", "altText": "ฟอร์มสั่งออเดอร์", "contents": flex_msg["contents"]}
 
         text_msg = (
             "คัดลอกข้อความนี้ แก้ไขจำนวน/หมายเหตุ แล้วส่งกลับได้เลย\n"
@@ -646,6 +530,98 @@ def resolve_public_image_url(path, logger=None):
         if logger:
             logger.warning({"event": "line_image_get_url_failed", "file_url": path})
         return None
+
+
+def fetch_menu_items(limit=10):
+    return frappe.get_all(
+        "Item",
+        filters={"custom_add_in_line_menu": 1},
+        fields=["name", "item_name", "description", "custom_line_menu_image"],
+        limit=limit,
+    )
+
+
+def build_summary_bubble(image_url, title, subtitle, body_contents=None):
+    contents = body_contents or []
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": contents,
+            "spacing": "md",
+        },
+    }
+    if image_url:
+        bubble["hero"] = {
+            "type": "image",
+            "url": image_url,
+            "size": "full",
+            "aspectRatio": "20:13",
+            "aspectMode": "cover",
+            "action": {"type": "uri", "label": "ดูภาพ", "uri": image_url},
+        }
+    # Ensure title/subtitle at top
+    if contents == body_contents:
+        bubble["body"]["contents"] = [
+            {"type": "text", "text": title, "weight": "bold", "size": "lg"},
+            {"type": "text", "text": subtitle, "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
+            *contents,
+        ]
+    return bubble
+
+
+def build_item_bubble(item, logger=None):
+    title = item.item_name or item.name
+    desc = (item.description or "").strip()
+    if len(desc) > 120:
+        desc = desc[:117] + "..."
+    image_url = resolve_public_image_url(getattr(item, "custom_line_menu_image", None) or item.get("custom_line_menu_image"), logger)
+
+    body_contents = [
+        {"type": "text", "text": title, "weight": "bold", "size": "md", "wrap": True},
+    ]
+    if desc:
+        body_contents.append(
+            {"type": "text", "text": desc, "size": "sm", "color": "#555555", "wrap": True}
+        )
+
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": body_contents,
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": "#22bb33",
+                    "action": {
+                        "type": "message",
+                        "label": "สั่งออเดอร์",
+                        "text": "สั่งออเดอร์",
+                    },
+                }
+            ],
+        },
+    }
+    if image_url:
+        bubble["hero"] = {
+            "type": "image",
+            "url": image_url,
+            "size": "full",
+            "aspectRatio": "1:1",
+            "aspectMode": "cover",
+            "action": {"type": "uri", "label": "ดูภาพ", "uri": image_url},
+        }
+    return bubble
 
 
 def register_customer(profile_doc, full_name, phone_number, reply_token):
