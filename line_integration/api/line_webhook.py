@@ -21,6 +21,13 @@ DEFAULT_ORDER_REPLY = "แจ้งรายการสั่งซื้อห
 DEFAULT_LOYALTY_PROGRAM = "Wellie Point"
 PHONE_REGEX = re.compile(r"^\d{10}$")
 
+KEYWORD_KIND_MAP = {
+    "register": "Register",
+    "points": "Points",
+    "menu": "Menu",
+    "order": "Order",
+}
+
 
 @frappe.whitelist(allow_guest=True)
 def line_webhook():
@@ -108,22 +115,14 @@ def handle_event(event):
             lower = text.lower()
             normalized = "".join(lower.split())
 
-            register_keywords = parse_keywords(
-                settings.register_keywords,
-                defaults=["register", "สมัครสมาชิก", "สมาชิก"],
+            register_keywords = collect_keywords(settings, "register", ["register", "สมัครสมาชิก", "สมาชิก"])
+            points_keywords = collect_keywords(settings, "points", ["ตรวจสอบpointคงเหลือ"])
+            menu_keywords = collect_keywords(settings, "menu", ["เมนู"])
+            order_keyword = first_keyword(
+                collect_keywords(settings, "order", [settings.order_keyword or "สั่งออเดอร์"]),
+                default="สั่งออเดอร์",
             )
-            points_keywords = parse_keywords(
-                settings.points_keywords,
-                defaults=["ตรวจสอบpointคงเหลือ"],
-            )
-            menu_keywords = parse_keywords(
-                settings.menu_keywords,
-                defaults=["เมนู"],
-            )
-            order_keyword = (settings.order_keyword or "สั่งออเดอร์").strip()
-            order_key_norm = (
-                "".join(order_keyword.lower().split()) if order_keyword else None
-            )
+            order_key_norm = "".join(order_keyword.lower().split()) if order_keyword else None
             register_prompt = settings.register_prompt or DEFAULT_REGISTER_PROMPT
             ask_phone_prompt = settings.ask_phone_prompt or DEFAULT_ASK_PHONE_PROMPT
             already_registered_msg = (
@@ -199,7 +198,8 @@ def link_customer(profile_doc, phone_number, reply_token):
 def reply_points(profile_doc, reply_token):
     if not profile_doc.customer:
         register_kw = first_keyword(
-            get_settings().register_keywords, default="สมัครสมาชิก"
+            collect_keywords(get_settings(), "register", ["สมัครสมาชิก"]),
+            default="สมัครสมาชิก",
         )
         reply_message(
             reply_token,
@@ -384,9 +384,13 @@ def reply_registered_flex(profile_doc, reply_token, settings):
     display_name = (details and details.get("customer_name")) or customer or "สมาชิก"
     phone = (details and details.get("mobile_no")) or "-"
     points_button_text = first_keyword(
-        settings.points_keywords, default="ตรวจสอบ Point คงเหลือ"
+        collect_keywords(settings, "points", ["ตรวจสอบ Point คงเหลือ"]),
+        default="ตรวจสอบ Point คงเหลือ",
     )
-    order_button_text = settings.order_keyword or "สั่งออเดอร์"
+    order_button_text = first_keyword(
+        collect_keywords(settings, "order", [settings.order_keyword or "สั่งออเดอร์"]),
+        default="สั่งออเดอร์",
+    )
 
     flex = {
         "type": "flex",
@@ -429,7 +433,7 @@ def reply_registered_flex(profile_doc, reply_token, settings):
 
 def parse_keywords(raw_text, defaults=None):
     defaults = defaults or []
-    raw = (raw_text or "").strip()
+    raw = (raw_text or "").strip() if isinstance(raw_text, str) else ""
     parts = []
     if raw:
         parts.extend([p for p in raw.replace("\n", ",").split(",") if p.strip()])
@@ -439,7 +443,40 @@ def parse_keywords(raw_text, defaults=None):
     return normalized
 
 
+def collect_keywords(settings, kind, defaults=None):
+    """Return normalized set of keywords for a kind (register/points/menu/order)."""
+    defaults = defaults or []
+    kind_label = KEYWORD_KIND_MAP.get(kind, kind).lower()
+    # From child table first
+    child_parts = []
+    try:
+        for row in settings.get("keywords") or []:
+            if (row.keyword_type or "").strip().lower() == kind_label and row.keyword:
+                child_parts.append(row.keyword)
+    except Exception:
+        child_parts = []
+
+    if child_parts:
+        raw = ",".join(child_parts)
+        return parse_keywords(raw, defaults)
+
+    # Fallback to legacy string fields
+    legacy_map = {
+        "register": settings.register_keywords,
+        "points": settings.points_keywords,
+        "menu": settings.menu_keywords,
+        "order": settings.order_keyword,
+    }
+    legacy_raw = legacy_map.get(kind)
+    return parse_keywords(legacy_raw, defaults)
+
+
 def first_keyword(raw_text, default):
+    if isinstance(raw_text, (list, tuple, set)):
+        for item in raw_text:
+            t = str(item or "").strip()
+            if t:
+                return t
     raw = (raw_text or "").replace("\n", ",")
     for part in raw.split(","):
         t = part.strip()

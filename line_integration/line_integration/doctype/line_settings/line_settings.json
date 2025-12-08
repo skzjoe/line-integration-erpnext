@@ -3,8 +3,13 @@
   "doctype": "DocType",
   "module": "Line Integration",
   "custom": 0,
-  "is_single": 1,
+  "issingle": 1,
   "fields": [
+    {
+      "fieldname": "tab_api",
+      "fieldtype": "Tab Break",
+      "label": "API & Credential"
+    },
     {
       "fieldname": "enabled",
       "fieldtype": "Check",
@@ -26,6 +31,19 @@
       "fieldtype": "Password",
       "label": "Channel Access Token",
       "length": 512
+    },
+    {
+      "fieldname": "tab_keywords",
+      "fieldtype": "Tab Break",
+      "label": "Keywords"
+    },
+    {
+      "fieldname": "keywords",
+      "fieldtype": "Table",
+      "label": "Keywords",
+      "options": "LINE Settings Keyword",
+      "description": "ตั้งคำได้หลายคำต่อประเภท (Register/Points/Menu/Order)",
+      "in_list_view": 0
     },
     {
       "fieldname": "section_keywords",
@@ -61,10 +79,9 @@
       "default": "สั่งออเดอร์"
     },
     {
-      "fieldname": "menu_summary_image",
-      "fieldtype": "Attach Image",
-      "label": "Menu Summary Image",
-      "description": "รูปภาพสรุปเมนูที่ต้องการส่งก่อนคารูเซลเมนู"
+      "fieldname": "tab_prompts",
+      "fieldtype": "Tab Break",
+      "label": "Prompts & Responses"
     },
     {
       "fieldname": "section_messages",
@@ -94,6 +111,17 @@
       "fieldtype": "Small Text",
       "label": "Order Reply Message",
       "default": "แจ้งรายการสั่งซื้อหรือพิมพ์ชื่อเมนูที่ต้องการได้เลยค่ะ"
+    },
+    {
+      "fieldname": "tab_menu",
+      "fieldtype": "Tab Break",
+      "label": "Menu"
+    },
+    {
+      "fieldname": "menu_summary_image",
+      "fieldtype": "Attach Image",
+      "label": "Menu Summary Image",
+      "description": "รูปภาพสรุปเมนูที่ต้องการส่งก่อนคารูเซลเมนู"
     },
     {
       "fieldname": "section_loyalty",
