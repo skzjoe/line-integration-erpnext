@@ -5,7 +5,7 @@ import json
 import re
 
 import frappe
-from frappe.utils import now_datetime, today
+from frappe.utils import get_url, now_datetime, today
 
 from line_integration.utils.line_client import (
     ensure_profile,
@@ -19,6 +19,7 @@ ALREADY_REGISTERED_MSG = "สวัสดีค่าคุณ {name} คุณ�
 CHECK_POINTS_KEY = "ตรวจสอบpointคงเหลือ"
 LOYALTY_PROGRAM = "Wellie Point"
 REGISTER_KEYWORDS = {"register", "สมัครสมาชิก", "สมาชิก"}
+MENU_KEYWORDS = {"เมนู"}
 PHONE_REGEX = re.compile(r"^\d{10}$")
 
 
@@ -110,6 +111,9 @@ def handle_event(event):
             if normalized == CHECK_POINTS_KEY:
                 reply_points(profile_doc, event.get("replyToken"))
                 return
+            if normalized in MENU_KEYWORDS:
+                reply_menu(event.get("replyToken"))
+                return
             if state and state.get("stage") == "awaiting_name":
                 save_state(user_id, {"stage": "awaiting_phone", "name": text})
                 reply_message(event.get("replyToken"), ASK_PHONE_PROMPT)
@@ -200,6 +204,83 @@ def reply_points(profile_doc, reply_token):
             reply_token,
             "ขออภัย ไม่สามารถตรวจสอบคะแนนได้ในขณะนี้ กรุณาลองใหม่อีกครั้งค่ะ",
         )
+
+
+def reply_menu(reply_token):
+    items = frappe.get_all(
+        "Item",
+        filters={"custom_add_in_line_menu": 1},
+        fields=["name", "item_name", "description", "custom_line_menu_image"],
+        limit=10,
+    )
+    if not items:
+        reply_message(reply_token, "ยังไม่มีเมนูที่พร้อมแสดงค่ะ")
+        return
+
+    bubbles = []
+    for item in items:
+        title = item.item_name or item.name
+        desc = (item.description or "").strip()
+        if len(desc) > 120:
+            desc = desc[:117] + "..."
+        image_url = None
+        if item.custom_line_menu_image:
+            try:
+                image_url = get_url(item.custom_line_menu_image)
+            except Exception:
+                image_url = None
+
+        body_contents = [
+            {"type": "text", "text": title, "weight": "bold", "size": "md", "wrap": True},
+        ]
+        if desc:
+            body_contents.append(
+                {"type": "text", "text": desc, "size": "sm", "color": "#555555", "wrap": True}
+            )
+
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": body_contents,
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "primary",
+                        "color": "#22bb33",
+                        "action": {
+                            "type": "message",
+                            "label": "สั่งออเดอร์",
+                            "text": f"สั่งออเดอร์ {title}",
+                        },
+                    }
+                ],
+            },
+        }
+        if image_url:
+            bubble["hero"] = {
+                "type": "image",
+                "url": image_url,
+                "size": "full",
+                "aspect_ratio": "1:1",
+                "aspect_mode": "cover",
+            }
+
+        bubbles.append(bubble)
+
+    flex = {
+        "type": "flex",
+        "altText": "เมนู Wellie",
+        "contents": {"type": "carousel", "contents": bubbles},
+    }
+    reply_message(reply_token, flex)
 
 
 def reply_registered_flex(profile_doc, reply_token):
@@ -301,20 +382,38 @@ def register_customer(profile_doc, full_name, phone_number, reply_token):
             }
         ).insert(ignore_permissions=True)
 
-        frappe.get_doc(
-            {
-                "doctype": "Contact",
-                "first_name": full_name,
-                "mobile_no": phone_number,
-                "phone": phone_number,
-                "links": [
+        contact_name = frappe.db.get_value("Contact", {"mobile_no": phone_number}, "name")
+        if contact_name:
+            contact_doc = frappe.get_doc("Contact", contact_name)
+            # Ensure the contact is linked to this customer
+            already_linked = any(
+                (lnk.link_doctype == "Customer" and lnk.link_name == customer.name)
+                for lnk in (contact_doc.links or [])
+            )
+            if not already_linked:
+                contact_doc.append(
+                    "links",
                     {
                         "link_doctype": "Customer",
                         "link_name": customer.name,
-                    }
-                ],
-            }
-        ).insert(ignore_permissions=True)
+                    },
+                )
+                contact_doc.save(ignore_permissions=True)
+        else:
+            frappe.get_doc(
+                {
+                    "doctype": "Contact",
+                    "first_name": full_name,
+                    "mobile_no": phone_number,
+                    "phone": phone_number,
+                    "links": [
+                        {
+                            "link_doctype": "Customer",
+                            "link_name": customer.name,
+                        }
+                    ],
+                }
+            ).insert(ignore_permissions=True)
 
         profile_doc.customer = customer.name
         profile_doc.status = "Active"

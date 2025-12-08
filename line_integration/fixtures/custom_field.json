@@ -1,0 +1,22 @@
+[
+  {
+    "doctype": "Custom Field",
+    "name": "custom_add_in_line_menu",
+    "dt": "Item",
+    "fieldname": "custom_add_in_line_menu",
+    "label": "Add In Line Menu",
+    "fieldtype": "Check",
+    "insert_after": "image",
+    "owner": "Administrator"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "custom_line_menu_image",
+    "dt": "Item",
+    "fieldname": "custom_line_menu_image",
+    "label": "Line Menu Image",
+    "fieldtype": "Attach Image",
+    "insert_after": "custom_add_in_line_menu",
+    "owner": "Administrator"
+  }
+]
