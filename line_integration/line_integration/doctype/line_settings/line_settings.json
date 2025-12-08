@@ -38,14 +38,6 @@
       "label": "Keywords"
     },
     {
-      "fieldname": "keywords",
-      "fieldtype": "Table",
-      "label": "Keywords",
-      "options": "LINE Settings Keyword",
-      "description": "ตั้งคำได้หลายคำต่อประเภท (Register/Points/Menu/Order)",
-      "in_list_view": 0
-    },
-    {
       "fieldname": "section_keywords",
       "fieldtype": "Section Break",
       "label": "Keywords"

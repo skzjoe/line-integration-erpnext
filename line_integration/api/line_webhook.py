@@ -118,11 +118,7 @@ def handle_event(event):
             register_keywords = collect_keywords(settings, "register", ["register", "สมัครสมาชิก", "สมาชิก"])
             points_keywords = collect_keywords(settings, "points", ["ตรวจสอบpointคงเหลือ"])
             menu_keywords = collect_keywords(settings, "menu", ["เมนู"])
-            order_keyword = first_keyword(
-                collect_keywords(settings, "order", [settings.order_keyword or "สั่งออเดอร์"]),
-                default="สั่งออเดอร์",
-            )
-            order_key_norm = "".join(order_keyword.lower().split()) if order_keyword else None
+            order_keywords = collect_keywords(settings, "order", [settings.order_keyword or "สั่งออเดอร์"])
             register_prompt = settings.register_prompt or DEFAULT_REGISTER_PROMPT
             ask_phone_prompt = settings.ask_phone_prompt or DEFAULT_ASK_PHONE_PROMPT
             already_registered_msg = (
@@ -130,13 +126,13 @@ def handle_event(event):
             )
             order_reply_msg = settings.order_reply_message or DEFAULT_ORDER_REPLY
 
-            if normalized in points_keywords:
+            if normalized in points_keywords["normalized"]:
                 reply_points(profile_doc, event.get("replyToken"))
                 return
-            if normalized in menu_keywords:
+            if normalized in menu_keywords["normalized"]:
                 reply_menu(event.get("replyToken"), settings)
                 return
-            if order_key_norm and normalized == order_key_norm:
+            if normalized in order_keywords["normalized"]:
                 reply_message(
                     event.get("replyToken"),
                     order_reply_msg,
@@ -158,7 +154,7 @@ def handle_event(event):
                         "กรุณาส่งหมายเลขโทรศัพท์ 10 หลักของคุณ (ไม่มีขีดหรือตัวอักษรอื่นๆ).",
                     )
                 return
-            if normalized in register_keywords:
+            if normalized in register_keywords["normalized"]:
                 if profile_doc.customer:
                     reply_registered_flex(profile_doc, event.get("replyToken"), settings)
                     return
@@ -198,7 +194,7 @@ def link_customer(profile_doc, phone_number, reply_token):
 def reply_points(profile_doc, reply_token):
     if not profile_doc.customer:
         register_kw = first_keyword(
-            collect_keywords(get_settings(), "register", ["สมัครสมาชิก"]),
+            collect_keywords(get_settings(), "register", ["สมัครสมาชิก"])["raw"],
             default="สมัครสมาชิก",
         )
         reply_message(
@@ -384,11 +380,11 @@ def reply_registered_flex(profile_doc, reply_token, settings):
     display_name = (details and details.get("customer_name")) or customer or "สมาชิก"
     phone = (details and details.get("mobile_no")) or "-"
     points_button_text = first_keyword(
-        collect_keywords(settings, "points", ["ตรวจสอบ Point คงเหลือ"]),
+        collect_keywords(settings, "points", ["ตรวจสอบ Point คงเหลือ"])["raw"],
         default="ตรวจสอบ Point คงเหลือ",
     )
     order_button_text = first_keyword(
-        collect_keywords(settings, "order", [settings.order_keyword or "สั่งออเดอร์"]),
+        collect_keywords(settings, "order", [settings.order_keyword or "สั่งออเดอร์"])["raw"],
         default="สั่งออเดอร์",
     )
 
@@ -432,35 +428,26 @@ def reply_registered_flex(profile_doc, reply_token, settings):
 
 
 def parse_keywords(raw_text, defaults=None):
+    """Parse a comma/newline-separated string into a list of trimmed keywords."""
     defaults = defaults or []
     raw = (raw_text or "").strip() if isinstance(raw_text, str) else ""
     parts = []
     if raw:
-        parts.extend([p for p in raw.replace("\n", ",").split(",") if p.strip()])
+        parts.extend([p.strip() for p in raw.replace("\n", ",").split(",") if p.strip()])
     if not parts and defaults:
-        parts = defaults
-    normalized = set("".join(p.lower().split()) for p in parts)
-    return normalized
+        parts = [p for p in defaults if p]
+    return parts
+
+
+def normalize_keywords(keywords):
+    return set("".join(p.lower().split()) for p in keywords if p)
 
 
 def collect_keywords(settings, kind, defaults=None):
-    """Return normalized set of keywords for a kind (register/points/menu/order)."""
+    """Return both raw list and normalized set of keywords for a kind."""
     defaults = defaults or []
     kind_label = KEYWORD_KIND_MAP.get(kind, kind).lower()
-    # From child table first
-    child_parts = []
-    try:
-        for row in settings.get("keywords") or []:
-            if (row.keyword_type or "").strip().lower() == kind_label and row.keyword:
-                child_parts.append(row.keyword)
-    except Exception:
-        child_parts = []
-
-    if child_parts:
-        raw = ",".join(child_parts)
-        return parse_keywords(raw, defaults)
-
-    # Fallback to legacy string fields
+    # Prefer simple text fields (allowing comma or newline separated keywords)
     legacy_map = {
         "register": settings.register_keywords,
         "points": settings.points_keywords,
@@ -468,7 +455,12 @@ def collect_keywords(settings, kind, defaults=None):
         "order": settings.order_keyword,
     }
     legacy_raw = legacy_map.get(kind)
-    return parse_keywords(legacy_raw, defaults)
+    raw_keywords = parse_keywords(legacy_raw, defaults)
+
+    return {
+        "raw": raw_keywords,
+        "normalized": normalize_keywords(raw_keywords),
+    }
 
 
 def first_keyword(raw_text, default):
