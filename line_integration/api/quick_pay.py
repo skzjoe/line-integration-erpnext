@@ -65,7 +65,16 @@ def request_payment(sales_order: str):
         frappe.throw(_("Sales Order must be Submitted"))
 
     total_text = frappe.utils.fmt_money(so.grand_total, currency=so.currency)
-    text = "{msg}\nยอดที่ต้องชำระ: {total}".format(msg=message, total=total_text)
+    total_qty = sum((row.qty or 0) for row in (so.items or []))
+
+    lines = [
+        message,
+        f"หมายเลขออเดอร์ : {so.name}",
+    ]
+    for row in so.items or []:
+        lines.append(f"{row.item_name or row.item_code} {row.qty} ขวด")
+    lines.append(f"รวม {total_text}")
+    text = "\n".join(lines)
 
     if not qr_url:
         frappe.throw(_("Please set a public QR Code image in LINE Settings"))
