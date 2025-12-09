@@ -126,21 +126,26 @@ def handle_event(event, settings):
             # Pending order confirmation flow
             pending_order = get_order_state(user_id)
             if pending_order:
-                if normalized in CONFIRM_KEYWORDS:
-                    handled = finalize_order_from_state(profile_doc, pending_order, event.get("replyToken"), settings)
-                    if handled:
-                        clear_order_state(user_id)
-                        return
-                if normalized in CANCEL_KEYWORDS:
+                has_qty_lines = any(QTY_PATTERN.search((ln or "").strip()) for ln in (text or "").splitlines())
+                if has_qty_lines:
+                    # Treat as new order; discard pending state and continue parsing fresh
                     clear_order_state(user_id)
-                    reply_message(event.get("replyToken"), "ยกเลิกออเดอร์เรียบร้อยค่ะ")
+                else:
+                    if normalized in CONFIRM_KEYWORDS:
+                        handled = finalize_order_from_state(profile_doc, pending_order, event.get("replyToken"), settings)
+                        if handled:
+                            clear_order_state(user_id)
+                            return
+                    if normalized in CANCEL_KEYWORDS:
+                        clear_order_state(user_id)
+                        reply_message(event.get("replyToken"), "ยกเลิกออเดอร์เรียบร้อยค่ะ")
+                        return
+                    # If other text while pending, remind
+                    reply_message(
+                        event.get("replyToken"),
+                        "กรุณาพิมพ์ \"ยืนยัน\" เพื่อยืนยันออเดอร์ หรือ \"ยกเลิก\" หากต้องการแก้ไขค่ะ",
+                    )
                     return
-                # If other text while pending, remind
-                reply_message(
-                    event.get("replyToken"),
-                    "กรุณาพิมพ์ \"ยืนยัน\" เพื่อยืนยันออเดอร์ หรือ \"ยกเลิก\" หากต้องการแก้ไขค่ะ",
-                )
-                return
 
             register_keywords = collect_keywords(settings, "register", ["register", "สมัครสมาชิก", "สมาชิก"])
             points_keywords = collect_keywords(settings, "points", ["ตรวจสอบpointคงเหลือ"])
@@ -704,6 +709,9 @@ def parse_orders_from_text(text, item_map):
             continue
         if qty == 0:
             continue  # treat as not ordered
+        if not qty.is_integer():
+            invalid_qty.append(line)
+            continue
         key = normalize_key(name)
         item = item_map.get(key)
         if not item:

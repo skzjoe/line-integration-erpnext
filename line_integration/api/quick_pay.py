@@ -3,6 +3,7 @@ from frappe import _
 
 from line_integration.utils.line_client import get_settings, push_message
 from line_integration.api.line_webhook import resolve_public_image_url, format_qty
+from frappe.utils.jinja import render_template
 
 
 @frappe.whitelist()
@@ -96,3 +97,39 @@ def request_payment(sales_order: str):
             sent_count += 1
 
     return _("Sent payment request to {0} LINE user(s).").format(sent_count)
+
+
+@frappe.whitelist()
+def print_bag_label(sales_order: str):
+    """Render a simple printable label for the sales order."""
+    if not sales_order:
+        frappe.throw(_("Sales Order is required"))
+    so = frappe.get_doc("Sales Order", sales_order)
+    if so.docstatus != 1:
+        frappe.throw(_("Sales Order must be Submitted"))
+    context = {
+        "customer_name": so.customer_name or so.customer,
+        "items": [
+            {"item_name": row.item_name or row.item_code, "qty": format_qty(row.qty)}
+            for row in so.items
+        ],
+        "total": frappe.utils.fmt_money(so.grand_total, currency=so.currency),
+    }
+    html = render_template("line_integration/api/print_label.html", context)
+    frappe.response["type"] = "binary"
+    frappe.response["filename"] = f"BagLabel-{so.name}.html"
+    frappe.response["filecontent"] = html
+    frappe.response["display_content_as"] = "utf-8"
+
+
+@frappe.whitelist()
+def get_order_copy_text(sales_order: str):
+    """Return plain text order summary for copying."""
+    if not sales_order:
+        frappe.throw(_("Sales Order is required"))
+    so = frappe.get_doc("Sales Order", sales_order)
+    lines = [so.customer_name or so.customer]
+    for row in so.items:
+        lines.append(f"{row.item_name or row.item_code} : {format_qty(row.qty)}")
+    lines.append(f"{frappe.utils.fmt_money(so.grand_total, currency=so.currency)}")
+    return "\n".join(lines)
