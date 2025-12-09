@@ -513,7 +513,7 @@ def finalize_order_from_state(profile_doc, state, reply_token, settings):
             "ไม่พบออเดอร์ที่รอยืนยัน กรุณาพิมพ์ \"สั่งออเดอร์\" เพื่อเริ่มใหม่ค่ะ",
         )
         return True
-    if not settings.auto_create_sales_order or not settings.require_order_confirmation:
+    if not settings.auto_create_sales_order:
         reply_message(reply_token, "ระบบไม่ได้เปิดสร้าง Sales Order อัตโนมัติค่ะ")
         return True
     if not profile_doc.customer:
