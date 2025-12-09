@@ -564,7 +564,53 @@ def finalize_order_from_state(profile_doc, state, reply_token, settings):
 
 def finalize_order_submission(profile_doc, text, reply_token, settings):
     """Directly create Sales Order (no confirmation)."""
-    return review_order_submission(profile_doc, text, reply_token, settings, user_id=None)
+    logger = frappe.logger("line_webhook")
+    if not settings.auto_create_sales_order:
+        return False
+    if not profile_doc.customer:
+        register_kw = first_keyword(
+            collect_keywords(settings, "register", ["สมัครสมาชิก"])["raw"],
+            default="สมัครสมาชิก",
+        )
+        reply_message(
+            reply_token,
+            f"ยังไม่พบข้อมูลสมาชิก กรุณาพิมพ์ {register_kw} เพื่อลงทะเบียนก่อนส่งออเดอร์นะคะ",
+        )
+        return True
+
+    menu_items = fetch_menu_items(limit=200)
+    item_map = {normalize_key(item.item_name or item.name): item for item in menu_items}
+
+    orders, unknown, note, invalid_qty = parse_orders_from_text(text, item_map)
+
+    if not orders:
+        reply_message(
+            reply_token,
+            "ยังไม่พบจำนวนในข้อความที่ส่งมา กรุณาคัดลอกฟอร์มจากปุ่มสั่งออเดอร์ แล้วเติมจำนวนก่อนส่งอีกครั้งนะคะ",
+        )
+        return True
+    if invalid_qty:
+        reply_message(
+            reply_token,
+            "พบจำนวนไม่ถูกต้องในบรรทัดต่อไปนี้:\n- "
+            + "\n- ".join(invalid_qty)
+            + "\nกรุณาใส่จำนวนเป็นตัวเลขมากกว่า 0 แล้วส่งอีกครั้งค่ะ",
+        )
+        return True
+    if unknown:
+        reply_message(
+            reply_token,
+            "พบเมนูที่ไม่รู้จัก: " + ", ".join(unknown) + "\nกรุณาตรวจสอบชื่อเมนูตามรายการในฟอร์มแล้วส่งอีกครั้งค่ะ",
+        )
+        return True
+
+    # Build state-like dict and reuse finalize_order_from_state
+    state = {
+        "customer": profile_doc.customer,
+        "orders": [{"item_code": o["item"].name, "title": o["title"], "qty": o["qty"]} for o in orders],
+        "note": note,
+    }
+    return finalize_order_from_state(profile_doc, state, reply_token, settings)
 
 
 def reply_registered_flex(profile_doc, reply_token, settings):
