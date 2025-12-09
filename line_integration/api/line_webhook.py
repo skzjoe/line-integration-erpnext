@@ -457,12 +457,20 @@ def review_order_submission(profile_doc, text, reply_token, settings, user_id):
     menu_items = fetch_menu_items(limit=200)
     item_map = {normalize_key(item.item_name or item.name): item for item in menu_items}
 
-    orders, unknown, note = parse_orders_from_text(text, item_map)
+    orders, unknown, note, invalid_qty = parse_orders_from_text(text, item_map)
 
     if not orders:
         reply_message(
             reply_token,
             "ยังไม่พบจำนวนในข้อความที่ส่งมา กรุณาคัดลอกฟอร์มจากปุ่มสั่งออเดอร์ แล้วเติมจำนวนก่อนส่งอีกครั้งนะคะ",
+        )
+        return True
+    if invalid_qty:
+        reply_message(
+            reply_token,
+            "พบจำนวนไม่ถูกต้องในบรรทัดต่อไปนี้:\n- "
+            + "\n- ".join(invalid_qty)
+            + "\nกรุณาใส่จำนวนเป็นตัวเลขมากกว่า 0 แล้วส่งอีกครั้งค่ะ",
         )
         return True
     if unknown:
@@ -674,6 +682,7 @@ def parse_orders_from_text(text, item_map):
     orders = []
     unknown = []
     note = ""
+    invalid_qty = []
     for raw_line in (text or "").splitlines():
         line = raw_line.strip()
         if not line:
@@ -685,10 +694,14 @@ def parse_orders_from_text(text, item_map):
             continue
         match = QTY_PATTERN.match(line)
         if not match:
+            # If line mentions quantity but not parsable, collect as invalid
+            if "จำนวน" in line:
+                invalid_qty.append(line)
             continue
         name = match.group("name").strip()
         qty = float(match.group("qty") or 0)
         if qty <= 0:
+            invalid_qty.append(line)
             continue
         key = normalize_key(name)
         item = item_map.get(key)
@@ -701,7 +714,7 @@ def parse_orders_from_text(text, item_map):
             orders.append({"item": item, "qty": qty, "line": line, "title": item.item_name or item.name})
         else:
             unknown.append(name)
-    return orders, unknown, note
+    return orders, unknown, note, invalid_qty
 
 
 def resolve_public_image_url(path, logger=None):
