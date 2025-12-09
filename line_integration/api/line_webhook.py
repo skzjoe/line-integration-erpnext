@@ -491,7 +491,7 @@ def review_order_submission(profile_doc, text, reply_token, settings, user_id):
 
     lines = ["สรุปออเดอร์", f"ลูกค้า: {profile_doc.customer}"]
     for o in orders:
-        lines.append(f"- {o['title']} จำนวน: {o['qty']}")
+        lines.append(f"- {o['title']} จำนวน: {format_qty(o['qty'])}")
     if note:
         lines.append(f"หมายเหตุ: {note}")
     lines.append('พิมพ์ "ยืนยัน" เพื่อสร้างออเดอร์ หรือ "ยกเลิก" หากต้องการแก้ไข')
@@ -529,6 +529,7 @@ def finalize_order_from_state(profile_doc, state, reply_token, settings):
                 "delivery_date": add_days(today(), days_until_sat),
                 "ignore_pricing_rule": 1,
                 "remarks": note,
+                "line_order_note": note,
                 "items": build_so_items(orders, settings),
             }
         )

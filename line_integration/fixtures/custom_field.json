@@ -18,5 +18,15 @@
     "fieldtype": "Attach Image",
     "insert_after": "custom_add_in_line_menu",
     "owner": "Administrator"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Sales Order",
+    "fieldname": "line_order_note",
+    "label": "LINE Order Note",
+    "fieldtype": "Small Text",
+    "insert_after": "items",
+    "owner": "Administrator",
+    "read_only": 1
   }
 ]
