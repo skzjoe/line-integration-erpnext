@@ -212,6 +212,25 @@
       "default": ""
     },
     {
+      "fieldname": "section_delivery_note",
+      "fieldtype": "Section Break",
+      "label": "Delivery Note Notification"
+    },
+    {
+      "fieldname": "enable_delivery_note_notify",
+      "fieldtype": "Check",
+      "label": "Send Delivery Note Notification",
+      "default": "0",
+      "description": "ถ้าเปิด ระบบจะส่งข้อความเมื่อ Delivery Note ถูก Submit"
+    },
+    {
+      "fieldname": "delivery_note_message",
+      "fieldtype": "Data",
+      "label": "Delivery Note Message",
+      "default": "Your order {dn} has been submitted.",
+      "description": "ใช้ {dn} เป็นตัวแทนหมายเลขใบส่งของ"
+    },
+    {
       "fieldname": "section_request_pay",
       "fieldtype": "Section Break",
       "label": "Request Payment"
