@@ -844,45 +844,9 @@ def build_summary_bubble(image_url, title, subtitle, body_contents=None, aspect_
 
 def build_item_bubble(item, logger=None):
     title = item.item_name or item.name
-    desc = (item.description or "").strip()
-    if len(desc) > 120:
-        desc = desc[:117] + "..."
     image_url = resolve_public_image_url(getattr(item, "custom_line_menu_image", None) or item.get("custom_line_menu_image"), logger)
 
-    body_contents = [
-        {"type": "text", "text": title, "weight": "bold", "size": "md", "wrap": True},
-    ]
-    if desc:
-        body_contents.append(
-            {"type": "text", "text": desc, "size": "sm", "color": "#555555", "wrap": True}
-        )
-
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": body_contents,
-        },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "sm",
-            "contents": [
-                {
-                    "type": "button",
-                    "style": "primary",
-                    "color": "#22bb33",
-                    "action": {
-                        "type": "message",
-                        "label": "สั่งออเดอร์",
-                        "text": "สั่งออเดอร์",
-                    },
-                }
-            ],
-        },
-    }
+    bubble = {"type": "bubble"}
     if image_url:
         bubble["hero"] = {
             "type": "image",

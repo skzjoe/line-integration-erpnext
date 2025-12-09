@@ -39,20 +39,36 @@ def _make_sales_invoice(so, points_to_redeem=0, settings=None):
 
     si = make_sales_invoice(so.name)
     redeem_amount = 0
+    redemption_account = None
+    redemption_cost_center = None
     if points_to_redeem and settings:
-        redeem = _compute_redeem(so.customer, settings, points_to_redeem, so.grand_total)
+        lp_details = _get_loyalty_details(so.customer, settings) or {}
+        redemption_account = (
+            getattr(settings, "redeem_account", None)
+            or lp_details.get("loyalty_redemption_account")
+            or lp_details.get("redemption_account")
+        )
+        redemption_cost_center = (
+            getattr(settings, "redeem_cost_center", None)
+            or lp_details.get("loyalty_redemption_cost_center")
+            or lp_details.get("redemption_cost_center")
+        )
+        redeem = _compute_redeem(so.customer, settings, points_to_redeem, so.grand_total, lp_details)
         points_to_redeem = redeem["points_used"]
         redeem_amount = redeem["amount_used"]
     if redeem_amount > 0:
+        # Require redemption account when applying points
+        if not redemption_account:
+            frappe.throw(_("Please set Loyalty Redemption Account (in LINE Settings or Loyalty Program) before redeeming points."))
         si.redeem_loyalty_points = 1
         si.loyalty_points = points_to_redeem
         si.loyalty_amount = redeem_amount
         si.loyalty_program = settings.loyalty_program
         si.dont_create_loyalty_points = 1
-        if getattr(settings, "redeem_account", None):
-            si.redemption_account = settings.redeem_account
-        if getattr(settings, "redeem_cost_center", None):
-            si.redemption_cost_center = settings.redeem_cost_center
+        # Set both standard and loyalty-specific fields for compatibility
+        si.loyalty_redemption_account = redemption_account
+        if redemption_cost_center:
+            si.loyalty_redemption_cost_center = redemption_cost_center
 
     si.flags.ignore_permissions = True
     si.insert(ignore_permissions=True)
@@ -170,8 +186,8 @@ def _get_loyalty_details(customer, settings):
         return {}
 
 
-def _compute_redeem(customer, settings, points_requested, max_amount):
-    lp_details = _get_loyalty_details(customer, settings)
+def _compute_redeem(customer, settings, points_requested, max_amount, lp_details=None):
+    lp_details = lp_details or _get_loyalty_details(customer, settings)
     available_points = float(lp_details.get("loyalty_points", 0) or 0)
     conversion = float(lp_details.get("conversion_factor", 0) or 0)
     if conversion <= 0:
