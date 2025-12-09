@@ -845,19 +845,22 @@ def build_so_items(orders, settings):
     threshold = int(settings.qty_discount_threshold or 0)
     regular_price = float(settings.qty_price_regular or 0)
     discount_price = float(settings.qty_price_discount or 0)
+
+    total_qty = sum((row.get("qty") or 0) for row in orders)
     apply_discount = (
         bool(getattr(settings, "enable_qty_discount", False))
         and threshold > 0
         and discount_price > 0
+        and total_qty >= threshold
     )
+
     for row in orders:
         qty = row.get("qty") or 0
         item_row = {"item_code": row.get("item_code"), "qty": qty}
         if apply_discount:
-            if qty >= threshold and discount_price > 0:
-                item_row["rate"] = discount_price
-            elif regular_price > 0:
-                item_row["rate"] = regular_price
+            item_row["rate"] = discount_price
+        elif regular_price > 0:
+            item_row["rate"] = regular_price
         items.append(item_row)
     return items
 
