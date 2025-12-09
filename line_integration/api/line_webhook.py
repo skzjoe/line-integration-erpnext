@@ -113,7 +113,7 @@ def handle_event(event, settings):
         profile_doc.status = "Active"
         profile_doc.last_event = json.dumps(event)
         profile_doc.save(ignore_permissions=True)
-        reply_message(event.get("replyToken"), "Thanks for following us!")
+        # reply_message(event.get("replyToken"), "Thanks for following us!")
         return
 
     if event_type == "message":
@@ -181,7 +181,7 @@ def handle_event(event, settings):
                 if settings.require_order_confirmation:
                     handled = review_order_submission(profile_doc, text, event.get("replyToken"), settings, user_id)
                 else:
-                    handled = process_order_submission(profile_doc, text, event.get("replyToken"), settings)
+                    handled = finalize_order_submission(profile_doc, text, event.get("replyToken"), settings)
                 if handled:
                     return
 
@@ -560,6 +560,11 @@ def finalize_order_from_state(profile_doc, state, reply_token, settings):
             "ขออภัย ระบบยังไม่สามารถสร้าง Sales Order ได้ กรุณาลองใหม่หรือให้แอดมินช่วยดำเนินการค่ะ",
         )
     return True
+
+
+def finalize_order_submission(profile_doc, text, reply_token, settings):
+    """Directly create Sales Order (no confirmation)."""
+    return review_order_submission(profile_doc, text, reply_token, settings, user_id=None)
 
 
 def reply_registered_flex(profile_doc, reply_token, settings):

@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import add_days, getdate
 
 from line_integration.utils.line_client import get_settings, push_message
 from line_integration.api.line_webhook import resolve_public_image_url, format_qty
@@ -230,7 +231,11 @@ def _compute_redeem(customer, settings, points_requested, max_amount, lp_details
 
 @frappe.whitelist()
 def get_pending_order_items():
-    """Return aggregated pending items for all submitted, not fully delivered Sales Orders."""
+    """Return aggregated pending items for all submitted, not fully delivered Sales Orders up to the upcoming Saturday."""
+    today_date = getdate()
+    days_until_sat = (5 - today_date.weekday() + 7) % 7  # Saturday=5
+    target_date = add_days(today_date, days_until_sat)
+
     rows = frappe.db.sql(
         """
         SELECT soi.item_name, soi.item_code,
@@ -240,10 +245,12 @@ def get_pending_order_items():
         WHERE so.docstatus = 1
           AND IFNULL(so.status, '') NOT IN ('Closed', 'Completed')
           AND IFNULL(so.per_delivered, 0) < 100
+          AND so.delivery_date <= %s
         GROUP BY soi.item_name, soi.item_code
         HAVING pending_qty > 0
         ORDER BY soi.item_name
         """,
+        target_date,
         as_dict=True,
     )
     if not rows:
