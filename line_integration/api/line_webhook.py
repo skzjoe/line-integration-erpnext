@@ -694,15 +694,15 @@ def parse_orders_from_text(text, item_map):
             continue
         match = QTY_PATTERN.match(line)
         if not match:
-            # If line mentions quantity but not parsable, collect as invalid
-            if "จำนวน" in line:
-                invalid_qty.append(line)
+            # If mentions quantity butไม่มีตัวเลข ถือว่าไม่สั่ง (ข้าม)
             continue
         name = match.group("name").strip()
         qty = float(match.group("qty") or 0)
-        if qty <= 0:
+        if qty < 0:
             invalid_qty.append(line)
             continue
+        if qty == 0:
+            continue  # treat as not ordered
         key = normalize_key(name)
         item = item_map.get(key)
         if not item:
