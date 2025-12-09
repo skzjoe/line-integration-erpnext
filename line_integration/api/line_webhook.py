@@ -24,7 +24,7 @@ PHONE_REGEX = re.compile(r"^\d{10}$")
 CONFIRM_KEYWORDS = {"confirm", "ยืนยัน", "ตกลง"}
 CANCEL_KEYWORDS = {"cancel", "ยกเลิก"}
 QTY_PATTERN = re.compile(
-    r"^[\-\u2022\u2013\u2014]?\s*(?P<name>.+?)\s*จำนวน[:：]?\s*(?P<qty>[0-9]+(?:\.[0-9]+)?)\s*$",
+    r"^[\-\u2022\u2013\u2014]?\s*(?P<name>.+?)\s*จำนวน[:：]?\s*(?P<qty>[0-9\+\-\*/\(\)\.\s]+)\s*$",
     re.IGNORECASE,
 )
 
@@ -684,6 +684,65 @@ def format_qty(val):
     return str(val)
 
 
+def eval_qty_expression(expr):
+    """Safely evaluate a simple arithmetic expression for quantity."""
+    import ast
+    expr = (expr or "").strip()
+    tree = ast.parse(expr, mode="eval")
+
+    allowed_nodes = (
+        ast.Expression,
+        ast.BinOp,
+        ast.UnaryOp,
+        ast.Num,
+        ast.Constant,
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.Div,
+        ast.FloorDiv,
+        ast.Pow,
+        ast.USub,
+        ast.UAdd,
+    )
+
+    def _eval(node):
+        if not isinstance(node, allowed_nodes):
+            raise ValueError("Unsupported expression")
+        if isinstance(node, ast.Expression):
+            return _eval(node.body)
+        if isinstance(node, ast.Num):  # py<3.8
+            return float(node.n)
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, (int, float)):
+                return float(node.value)
+            raise ValueError("Invalid constant")
+        if isinstance(node, ast.UnaryOp):
+            operand = _eval(node.operand)
+            if isinstance(node.op, ast.UAdd):
+                return +operand
+            if isinstance(node.op, ast.USub):
+                return -operand
+            raise ValueError("Unsupported unary op")
+        if isinstance(node, ast.BinOp):
+            left = _eval(node.left)
+            right = _eval(node.right)
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, (ast.Div, ast.FloorDiv)):
+                return left / right
+            if isinstance(node.op, ast.Pow):
+                return left**right
+            raise ValueError("Unsupported binary op")
+        raise ValueError("Unsupported expression")
+
+    return float(_eval(tree))
+
+
 def parse_orders_from_text(text, item_map):
     orders = []
     unknown = []
@@ -703,13 +762,17 @@ def parse_orders_from_text(text, item_map):
             # If mentions quantity butไม่มีตัวเลข ถือว่าไม่สั่ง (ข้าม)
             continue
         name = match.group("name").strip()
-        qty = float(match.group("qty") or 0)
-        if qty < 0:
+        try:
+            qty_val = eval_qty_expression(match.group("qty"))
+        except Exception:
             invalid_qty.append(line)
             continue
-        if qty == 0:
+        if qty_val < 0:
+            invalid_qty.append(line)
+            continue
+        if qty_val == 0:
             continue  # treat as not ordered
-        if not qty.is_integer():
+        if not qty_val.is_integer():
             invalid_qty.append(line)
             continue
         key = normalize_key(name)
@@ -720,7 +783,7 @@ def parse_orders_from_text(text, item_map):
                     item = candidate
                     break
         if item:
-            orders.append({"item": item, "qty": qty, "line": line, "title": item.item_name or item.name})
+            orders.append({"item": item, "qty": qty_val, "line": line, "title": item.item_name or item.name})
         else:
             unknown.append(name)
     return orders, unknown, note, invalid_qty
