@@ -624,6 +624,23 @@ def reply_registered_flex(profile_doc, reply_token, settings):
 
     display_name = (details and details.get("customer_name")) or customer or "สมาชิก"
     phone = (details and details.get("mobile_no")) or "-"
+    # Fetch loyalty points
+    points_text = "-"
+    try:
+        lp_details = None
+        loyalty_program = settings.loyalty_program or DEFAULT_LOYALTY_PROGRAM
+        from erpnext.accounts.doctype.loyalty_program.loyalty_program import (
+            get_loyalty_program_details_with_points,
+        )
+        lp_details = get_loyalty_program_details_with_points(
+            customer=customer,
+            loyalty_program=loyalty_program,
+        )
+        points_val = (lp_details or {}).get("loyalty_points", 0) or 0
+        points_text = format_qty(points_val)
+    except Exception:
+        points_text = "-"
+
     points_button_text = first_keyword(
         collect_keywords(settings, "points", ["ตรวจสอบ Point คงเหลือ"])["raw"],
         default="ตรวจสอบ Point คงเหลือ",
@@ -645,6 +662,7 @@ def reply_registered_flex(profile_doc, reply_token, settings):
                     {"type": "text", "text": "สมาชิก", "weight": "bold", "size": "lg"},
                     {"type": "text", "text": display_name, "size": "md", "margin": "sm"},
                     {"type": "text", "text": f"เบอร์: {phone}", "size": "sm", "color": "#555555", "margin": "sm"},
+                    {"type": "text", "text": f"แต้มสะสม: {points_text}", "size": "md", "color": "#555555", "margin": "sm"},
                 ],
                 "spacing": "md",
             },
