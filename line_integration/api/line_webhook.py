@@ -6,7 +6,7 @@ import re
 # import urllib.parse
 
 import frappe
-from frappe.utils import fmt_money, get_url, now_datetime, today
+from frappe.utils import add_days, fmt_money, get_url, now_datetime, today
 
 from line_integration.utils.line_client import (
     ensure_profile,
@@ -21,6 +21,10 @@ DEFAULT_ALREADY_REGISTERED_MSG = "สวัสดีค่าคุณ {name} �
 DEFAULT_ORDER_REPLY = "แจ้งรายการสั่งซื้อหรือพิมพ์ชื่อเมนูที่ต้องการได้เลยค่ะ"
 DEFAULT_LOYALTY_PROGRAM = "Wellie Point"
 PHONE_REGEX = re.compile(r"^\d{10}$")
+QTY_PATTERN = re.compile(
+    r"^[\-\u2022\u2013\u2014]?\s*(?P<name>.+?)\s*จำนวน[:：]?\s*(?P<qty>[0-9]+(?:\.[0-9]+)?)\s*$",
+    re.IGNORECASE,
+)
 
 KEYWORD_KIND_MAP = {
     "register": "Register",
@@ -142,8 +146,12 @@ def handle_event(event, settings):
 
             first_line = (text.splitlines()[0] if text else "").strip()
             first_line_norm = "".join(first_line.lower().split())
+            has_order_kw = first_line_norm in order_keywords["normalized"] or any(
+                kw in normalized for kw in order_keywords["normalized"]
+            )
+            has_qty_lines = any(QTY_PATTERN.search((ln or "").strip()) for ln in (text or "").splitlines())
 
-            if first_line_norm in order_keywords["normalized"]:
+            if has_order_kw and has_qty_lines:
                 handled = process_order_submission(profile_doc, text, event.get("replyToken"), settings)
                 if handled:
                     return
@@ -431,8 +439,6 @@ def process_order_submission(profile_doc, text, reply_token, settings):
     orders = []
     unknown = []
     note = ""
-    qty_pattern = re.compile(r"^[\-\u2022]?\s*(?P<name>.+?)\s*จำนวน[:：]?\s*(?P<qty>[0-9]+(?:\.[0-9]+)?)", re.IGNORECASE)
-
     for raw_line in lines:
         line = raw_line.strip()
         if not line:
@@ -442,7 +448,7 @@ def process_order_submission(profile_doc, text, reply_token, settings):
         if line.lower().startswith("หมายเหตุ"):
             note = line.split(":", 1)[1].strip() if ":" in line else line.replace("หมายเหตุ", "", 1).strip()
             continue
-        match = qty_pattern.match(line)
+        match = QTY_PATTERN.match(line)
         if not match:
             continue
         name = match.group("name").strip()
@@ -476,11 +482,15 @@ def process_order_submission(profile_doc, text, reply_token, settings):
         return True
 
     try:
+        weekday = now_datetime().weekday()  # Monday=0, Saturday=5
+        days_until_sat = (5 - weekday + 7) % 7  # 0..6
+
         so = frappe.get_doc(
             {
                 "doctype": "Sales Order",
                 "customer": profile_doc.customer,
                 "transaction_date": today(),
+                "delivery_date": add_days(today(), days_until_sat),
                 "ignore_pricing_rule": 1,
                 "remarks": note,
                 "items": [
