@@ -526,11 +526,15 @@ def finalize_order_from_state(profile_doc, state, reply_token, settings):
         so.insert(ignore_permissions=True)
         so.submit()
 
+        total_qty = sum(row.get("qty", 0) for row in orders)
         total_text = fmt_money(so.grand_total, currency=so.currency)
-        reply_message(
-            reply_token,
-            f"รับออเดอร์แล้ว สร้าง Sales Order {so.name} จำนวน {len(orders)} รายการ ยอดรวม {total_text}",
-        )
+        lines = [f"รับออเดอร์แล้ว จำนวน {len(orders)} รายการ"]
+        for row in orders:
+            lines.append(f"{row['title']} : {row['qty']} ขวด")
+        lines.append(f"ทั้งหมด {total_qty} ขวด")
+        lines.append(f"ยอดรวม {total_text}")
+        lines.append("ขอบคุณที่อุดหนุนนะคะ")
+        reply_message(reply_token, "\n".join(lines))
     except Exception:
         frappe.log_error(frappe.get_traceback(), "LINE Order Auto-create Error")
         reply_message(

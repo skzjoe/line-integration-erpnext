@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 
-from line_integration.utils.line_client import get_settings
+from line_integration.utils.line_client import get_settings, push_message
 from line_integration.api.line_webhook import resolve_public_image_url
 
 
@@ -70,5 +70,19 @@ def request_payment(sales_order: str):
     if not qr_url:
         frappe.throw(_("Please set a public QR Code image in LINE Settings"))
 
-    # Here we just return message; sending to LINE can be added via profile mapping if desired
-    return _("Payment request prepared: {0}").format(text)
+    # Push to all LINE Profiles linked to the Customer
+    profiles = frappe.get_all(
+        "LINE Profile",
+        filters={"customer": so.customer, "status": "Active"},
+        fields=["line_user_id"],
+    )
+    if not profiles:
+        return _("No LINE Profile linked to Customer {0}, nothing sent.").format(so.customer)
+
+    messages = [{"type": "text", "text": text}, {"type": "image", "originalContentUrl": qr_url, "previewImageUrl": qr_url}]
+    sent_count = 0
+    for p in profiles:
+        if push_message(p.line_user_id, messages):
+            sent_count += 1
+
+    return _("Sent payment request to {0} LINE user(s).").format(sent_count)

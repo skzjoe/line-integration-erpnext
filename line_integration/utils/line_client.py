@@ -89,17 +89,27 @@ def push_message(user_id, text):
     logger = frappe.logger("line_webhook")
     if not user_id:
         logger.info({"event": "line_push_skip", "reason": "missing_user_id"})
-        return
+        return False
     settings = get_settings()
     if not settings.enabled:
         logger.info({"event": "line_push_skip", "reason": "settings_disabled"})
-        return
+        return False
     access_token = get_decrypted_password("LINE Settings", "LINE Settings", "channel_access_token") or ""
     if not access_token:
         logger.warning({"event": "line_push_skip", "reason": "missing_access_token"})
-        return
+        return False
     url = "https://api.line.me/v2/bot/message/push"
-    payload = {"to": user_id, "messages": [{"type": "text", "text": text}]}
+    messages = []
+    if isinstance(text, str):
+        messages = [{"type": "text", "text": text}]
+    elif isinstance(text, dict):
+        messages = [text]
+    elif isinstance(text, (list, tuple)):
+        messages = list(text)
+    else:
+        logger.warning({"event": "line_push_skip", "reason": "unsupported_content_type"})
+        return False
+    payload = {"to": user_id, "messages": messages}
     try:
         resp = requests.post(
             url,
@@ -113,7 +123,7 @@ def push_message(user_id, text):
                     "event": "line_push_failed",
                     "status": resp.status_code,
                     "body": resp.text,
-                    "payload_messages": payload.get("messages"),
+                    "payload_messages": messages,
                 }
             )
             try:
@@ -122,22 +132,25 @@ def push_message(user_id, text):
                         "event": "line_push_failed",
                         "status": resp.status_code,
                         "body": resp.text,
-                        "payload_messages": payload.get("messages"),
+                        "payload_messages": messages,
                     },
                     "LINE Push Error",
                 )
             except Exception:
                 logger.warning({"event": "line_push_log_error_failed"})
+            return False
         else:
             logger.info(
                 {
                     "event": "line_push_success",
                     "status": resp.status_code,
-                    "payload_messages": payload.get("messages"),
+                    "payload_messages": messages,
                 }
             )
+            return True
     except Exception:
         frappe.log_error(frappe.get_traceback(), "LINE Push Error")
+        return False
 
 
 def ensure_profile(user_id, event=None):
