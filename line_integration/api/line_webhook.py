@@ -954,7 +954,7 @@ def register_customer(profile_doc, full_name, phone_number, reply_token):
 
         reply_message(
             reply_token,
-            f"Created customer {customer.name} and linked to your LINE. Thank you!",
+            f"ลงทะเบียนเรียบร้อย! คุณ {customer.customer_name or customer.name} สามารถพิมพ์ \"สั่งออเดอร์\" หรือกดจากเมนูได้เลยค่ะ",
         )
     except Exception:
         frappe.log_error(frappe.get_traceback(), "LINE Registration Error")
