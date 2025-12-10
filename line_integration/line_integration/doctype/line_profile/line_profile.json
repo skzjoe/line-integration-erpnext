@@ -14,7 +14,7 @@
     },
     {
       "fieldname": "display_name",
-      "fieldtype": "Long Text",
+      "fieldtype": "Data",
       "label": "Display Name"
     },
     {
