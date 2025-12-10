@@ -14,12 +14,12 @@
     },
     {
       "fieldname": "display_name",
-      "fieldtype": "Data",
+      "fieldtype": "Long Text",
       "label": "Display Name"
     },
     {
       "fieldname": "picture_url",
-      "fieldtype": "Data",
+      "fieldtype": "Long Text",
       "label": "Picture URL"
     },
     {
