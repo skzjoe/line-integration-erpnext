@@ -410,7 +410,7 @@ def reply_order_form(reply_token, settings):
         items = fetch_menu_items(limit=20)
         template_lines = ["“สั่งออเดอร์”"]
         for item in items or []:
-            title = item.item_name or item.name
+            title = (item.item_name or item.name or "").strip()
             template_lines.append(f"- {title} จำนวน: ")
         template_lines.append("หมายเหตุ: ")
         template_text = "\n".join(template_lines)
@@ -451,17 +451,11 @@ def review_order_submission(profile_doc, text, reply_token, settings, user_id):
     if not settings.auto_create_sales_order or not settings.require_order_confirmation:
         return False
 
-    menu_items = fetch_menu_items(limit=200)
+    menu_items = fetch_menu_items(limit=1000)
     item_map = {normalize_key(item.item_name or item.name): item for item in menu_items}
 
     orders, unknown, note, invalid_qty = parse_orders_from_text(text, item_map)
 
-    if not orders:
-        reply_message(
-            reply_token,
-            "ยังไม่พบจำนวนในข้อความที่ส่งมา กรุณาคัดลอกฟอร์มจากปุ่มสั่งออเดอร์ แล้วเติมจำนวนก่อนส่งอีกครั้งนะคะ",
-        )
-        return True
     if invalid_qty:
         reply_message(
             reply_token,
@@ -474,6 +468,12 @@ def review_order_submission(profile_doc, text, reply_token, settings, user_id):
         reply_message(
             reply_token,
             "พบเมนูที่ไม่รู้จัก: " + ", ".join(unknown) + "\nกรุณาตรวจสอบชื่อเมนูตามรายการในฟอร์มแล้วส่งอีกครั้งค่ะ",
+        )
+        return True
+    if not orders:
+        reply_message(
+            reply_token,
+            "ยังไม่พบจำนวนในข้อความที่ส่งมา กรุณาคัดลอกฟอร์มจากปุ่มสั่งออเดอร์ แล้วเติมจำนวนก่อนส่งอีกครั้งนะคะ",
         )
         return True
 
@@ -625,17 +625,11 @@ def finalize_order_submission(profile_doc, text, reply_token, settings, user_id)
     if not settings.auto_create_sales_order:
         return False
 
-    menu_items = fetch_menu_items(limit=200)
+    menu_items = fetch_menu_items(limit=1000)
     item_map = {normalize_key(item.item_name or item.name): item for item in menu_items}
 
     orders, unknown, note, invalid_qty = parse_orders_from_text(text, item_map)
 
-    if not orders:
-        reply_message(
-            reply_token,
-            "ยังไม่พบจำนวนในข้อความที่ส่งมา กรุณาคัดลอกฟอร์มจากปุ่มสั่งออเดอร์ แล้วเติมจำนวนก่อนส่งอีกครั้งนะคะ",
-        )
-        return True
     if invalid_qty:
         reply_message(
             reply_token,
@@ -648,6 +642,12 @@ def finalize_order_submission(profile_doc, text, reply_token, settings, user_id)
         reply_message(
             reply_token,
             "พบเมนูที่ไม่รู้จัก: " + ", ".join(unknown) + "\nกรุณาตรวจสอบชื่อเมนูตามรายการในฟอร์มแล้วส่งอีกครั้งค่ะ",
+        )
+        return True
+    if not orders:
+        reply_message(
+            reply_token,
+            "ยังไม่พบจำนวนในข้อความที่ส่งมา กรุณาคัดลอกฟอร์มจากปุ่มสั่งออเดอร์ แล้วเติมจำนวนก่อนส่งอีกครั้งนะคะ",
         )
         return True
 
@@ -1001,7 +1001,7 @@ def build_summary_bubble(image_url, title, subtitle, body_contents=None, aspect_
 
 
 def build_item_bubble(item, logger=None):
-    title = item.item_name or item.name
+    title = (item.item_name or item.name or "").strip()
     image_url = resolve_public_image_url(getattr(item, "custom_line_menu_image", None) or item.get("custom_line_menu_image"), logger)
 
     body = {
