@@ -946,30 +946,29 @@ def parse_orders_from_text(text, item_map):
             name_part = re.sub(r"^[\-\u2022\u2013\u2014]\s*", "", name_part).strip()
             
             # Clean up leading numbers like "1 ", "2." from name part? 
-            # User screenshot shows "- 1 Bye Heavy". 
-            # If we stripped "-", we have "1 Bye Heavy".
-            # The fuzzy matcher handles "byeheavy" in "1byeheavy" (k in key).
-            # But "1byeheavy" in "byeheavy" (key in k) is False.
-            # So "1 Bye Heavy" -> key="1byeheavy".
-            # item key="byeheavy".
-            # "byeheavy" in "1byeheavy" is TRUE. So it matches.
+            # item.name is likely short.
             pass
 
+            # Aggressively clean qty_part: keep only digits, ., +, -, *, /, (, )
+            # This removes any invisible characters, unicode spaces, etc.
+            clean_qty = re.sub(r"[^0-9\+\-\*/\(\)\.]", "", qty_part)
+
             try:
-                qty_val = eval_qty_expression(qty_part)
-            except Exception:
+                qty_val = eval_qty_expression(clean_qty)
+            except Exception as e:
                 # If eval failed, maybe it wasn't a quantity line or just garbage
-                invalid_qty.append(line)
+                # Append debug info to the line text for the user to see (temp)
+                invalid_qty.append(f"{line} (ค่าที่รับได้: '{qty_part}' -> '{clean_qty}', Error: {str(e)})")
                 continue
 
             if qty_val < 0:
-                invalid_qty.append(line)
+                invalid_qty.append(f"{line} (จำนวนต้องมากกว่า 0)")
                 continue
             if qty_val == 0:
                 continue
 
             if not qty_val.is_integer():
-                invalid_qty.append(line)
+                invalid_qty.append(f"{line} (ต้องเป็นจำนวนเต็มเท่านั้น)")
                 continue
 
             key = normalize_key(name_part)
