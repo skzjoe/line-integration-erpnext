@@ -888,44 +888,112 @@ def parse_orders_from_text(text, item_map):
     unknown = []
     note = ""
     invalid_qty = []
+    
+    # Common keywords separating name and quantity
+    # Order matters: more specific first
+    separators = ["จำนวน:", "จำนวน :", "จำนวน", "Qty:", "Qty :", "Qty"]
+
     for raw_line in (text or "").splitlines():
         line = raw_line.strip()
         if not line:
             continue
-        if line.lower().startswith("สั่งออเดอร์"):
+        # Skip header lines roughly
+        if "สั่งออเดอร์" in line:
             continue
-        if line.lower().startswith("หมายเหตุ"):
-            note = line.split(":", 1)[1].strip() if ":" in line else line.replace("หมายเหตุ", "", 1).strip()
+        if line.startswith("หมายเหตุ"):
+            # Handle Note
+            parts = line.split(":", 1)
+            if len(parts) > 1:
+                note = parts[1].strip()
+            else:
+                note = line.replace("หมายเหตุ", "", 1).strip()
             continue
-        match = QTY_PATTERN.match(line)
-        if not match:
-            # If mentions quantity butไม่มีตัวเลข ถือว่าไม่สั่ง (ข้าม)
-            continue
-        name = match.group("name").strip()
-        try:
-            qty_val = eval_qty_expression(match.group("qty"))
-        except Exception:
-            invalid_qty.append(line)
-            continue
-        if qty_val < 0:
-            invalid_qty.append(line)
-            continue
-        if qty_val == 0:
-            continue  # treat as not ordered
-        if not qty_val.is_integer():
-            invalid_qty.append(line)
-            continue
-        key = normalize_key(name)
-        item = item_map.get(key)
-        if not item:
-            for k, candidate in item_map.items():
-                if key in k or k in key:
-                    item = candidate
-                    break
-        if item:
-            orders.append({"item": item, "qty": qty_val, "line": line, "title": item.item_name or item.name})
+
+        # Try to split by separator
+        name_part = None
+        qty_part = None
+        
+        for sep in separators:
+            # Case-insensitive check
+            idx = line.lower().find(sep.lower())
+            if idx != -1:
+                name_part = line[:idx].strip()
+                # Extract part after separator
+                # We need exact length of matched sep to slice correctly, 
+                # but allow for case difference.
+                # Actually simpler: split by the specific substring found
+                # But we don't know exact casing found.
+                # simpler: slice using idx
+                qty_remainder = line[idx + len(sep):].strip()
+                
+                # If separator was just "จำนวน" but followed by ":", remove it from potential qty
+                if qty_remainder.startswith(":") or qty_remainder.startswith("："):
+                    qty_remainder = qty_remainder[1:].strip()
+                
+                qty_part = qty_remainder
+                break
+        
+        # If manual split didn't work, try regex as fallback
+        if name_part is None:
+            match = QTY_PATTERN.match(line)
+            if match:
+                name_part = match.group("name").strip()
+                qty_part = match.group("qty")
+
+        if name_part and qty_part:
+            # Clean up leading dash/bullet from name if present
+            # Regex: ^[\-\u2022\u2013\u2014]\s*
+            name_part = re.sub(r"^[\-\u2022\u2013\u2014]\s*", "", name_part).strip()
+            
+            # Clean up leading numbers like "1 ", "2." from name part? 
+            # User screenshot shows "- 1 Bye Heavy". 
+            # If we stripped "-", we have "1 Bye Heavy".
+            # The fuzzy matcher handles "byeheavy" in "1byeheavy" (k in key).
+            # But "1byeheavy" in "byeheavy" (key in k) is False.
+            # So "1 Bye Heavy" -> key="1byeheavy".
+            # item key="byeheavy".
+            # "byeheavy" in "1byeheavy" is TRUE. So it matches.
+            pass
+
+            try:
+                qty_val = eval_qty_expression(qty_part)
+            except Exception:
+                # If eval failed, maybe it wasn't a quantity line or just garbage
+                invalid_qty.append(line)
+                continue
+
+            if qty_val < 0:
+                invalid_qty.append(line)
+                continue
+            if qty_val == 0:
+                continue
+
+            if not qty_val.is_integer():
+                invalid_qty.append(line)
+                continue
+
+            key = normalize_key(name_part)
+            
+            # Try exact match first
+            item = item_map.get(key)
+            if not item:
+                # Fuzzy match
+                # Strategy: 
+                # 1. Check if item_key is substring of user_key (e.g. "byeheavy" in "1byeheavy")
+                # 2. Check if user_key is substring of item_key (e.g. "tea" in "icetea")
+                for k, candidate in item_map.items():
+                    if k in key or key in k:
+                        item = candidate
+                        break
+            
+            if item:
+                orders.append({"item": item, "qty": qty_val, "line": line, "title": item.item_name or item.name})
+            else:
+                unknown.append(name_part)
         else:
-            unknown.append(name)
+            # Could not parse name/qty
+            pass
+
     return orders, unknown, note, invalid_qty
 
 
