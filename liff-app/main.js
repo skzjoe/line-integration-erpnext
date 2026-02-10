@@ -159,11 +159,19 @@ function updateCartBadge() {
           cartNav.appendChild(badge);
       }
   }
+  updateFloatingCart();
 }
 
 function showPage(pageId) {
   contentEl.innerHTML = '';
   contentEl.classList.add('animated');
+  
+  // Hide floating cart on order page
+  const floatBtn = document.getElementById('floating-cart-btn');
+  if (floatBtn) {
+      if (pageId === 'order') floatBtn.style.display = 'none';
+      else floatBtn.style.display = 'block';
+  }
   
   switch(pageId) {
     case 'home': renderHome(); break;
@@ -267,18 +275,43 @@ window.addToCart = (itemCode) => {
   
   // Update badge immediately
   updateCartBadge();
+  updateFloatingCart();
   
   // Optional: Reset menu qty to 1
   if (qtyEl) qtyEl.textContent = '1';
   
-  liff.sendMessages([{
-      type: 'text',
-      text: `เพิ่ม ${item.item_name} จำนวน ${qty} ชิ้น ลงตะกร้าแล้ว`
-  }]).catch(() => {
-      // Fallback if sendMessages fails (e.g. not opened from LINE)
-      alert(`เพิ่ม ${item.item_name} จำนวน ${qty} ลงตะกร้าแล้ว`);
-  });
+  // Removed alert popup as requested
+  // liff.sendMessages(...) // also removed to be completely silent/non-intrusive on UI
 };
+
+function updateFloatingCart() {
+    let floatBtn = document.getElementById('floating-cart-btn');
+    const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+    const grandTotal = cart.reduce((sum, item) => sum + ((item.price || 0) * item.qty), 0);
+    
+    if (totalQty === 0) {
+        if (floatBtn) floatBtn.classList.add('hidden');
+        return;
+    }
+    
+    const formattedTotal = grandTotal.toLocaleString('th-TH', { style: 'currency', currency: 'THB' });
+    
+    if (!floatBtn) {
+        floatBtn = document.createElement('div');
+        floatBtn.id = 'floating-cart-btn';
+        floatBtn.className = 'floating-cart-btn';
+        floatBtn.onclick = () => showPage('order');
+        document.body.appendChild(floatBtn);
+    }
+    
+    floatBtn.innerHTML = `
+        <div class="float-content">
+            <div class="float-qty">${totalQty} รายการ</div>
+            <div class="float-total">ไปตะกร้า ${formattedTotal} ></div>
+        </div>
+    `;
+    floatBtn.classList.remove('hidden');
+}
 
 function renderOrder() {
   if (cart.length === 0) {

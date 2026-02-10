@@ -566,3 +566,54 @@ textarea.input-field {
     border: 2px solid white;
     transform: translate(50%, -50%);
 }
+
+/* Floating Cart Button */
+.floating-cart-btn {
+    position: fixed;
+    bottom: calc(var(--nav-height) + 20px);
+    left: 20px;
+    right: 20px;
+    background: var(--primary);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 50px;
+    box-shadow: 0 4px 15px rgba(6, 199, 85, 0.4);
+    z-index: 90;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: slideUp 0.3s ease;
+}
+
+.floating-cart-btn:active {
+    transform: scale(0.98);
+}
+
+.float-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+}
+
+.float-qty {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+.float-total {
+    font-size: 1.1rem;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
