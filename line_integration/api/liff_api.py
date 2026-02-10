@@ -181,7 +181,14 @@ def liff_get_menu(access_token=None):
         except:
             rate = 0
 
-        # Fallback to standard_rate if price is still 0
+        # Fallback 1: Item Price (Standard Selling)
+        if rate <= 0:
+            rate = frappe.db.get_value("Item Price", 
+                {"item_code": item.name, "price_list": "Standard Selling"}, 
+                "price_list_rate"
+            ) or 0
+
+        # Fallback 2: Item Standard Rate
         if rate <= 0:
             rate = flt(item.standard_rate)
 
