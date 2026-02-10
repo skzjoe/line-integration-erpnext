@@ -21,6 +21,7 @@ from line_integration.api.line_webhook import (
     DEFAULT_LOYALTY_PROGRAM,
     PHONE_REGEX,
 )
+from erpnext.stock.get_item_details import get_item_details
 
 
 # ──────────────────────────────────────────────
@@ -140,19 +141,57 @@ def liff_auth(access_token=None):
 # ──────────────────────────────────────────────
 
 @frappe.whitelist(allow_guest=True)
-def liff_get_menu():
+def liff_get_menu(access_token=None):
     # CORS handled by site_config
+    
+    # Try to identify user for specific pricing
+    customer = None
+    try:
+        if access_token:
+            profile_doc, _ = _get_liff_user(access_token)
+            customer = profile_doc.customer
+    except:
+        pass
+
     items = fetch_menu_items(limit=50)
     result = []
+    
+    # Pre-fetch default price list if needed
+    price_list = None
+    if not customer:
+        price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+
     for item in items:
         image_url = resolve_public_image_url(
             item.get("custom_line_menu_image")
         )
+        
+        # Calculate price
+        rate = 0
+        formatted_price = ""
+        try:
+            args = {
+                "item_code": item.name,
+                "qty": 1,
+                "customer": customer,
+                "price_list": price_list,
+                "company": frappe.db.get_default("Company"),
+                "transaction_date": today(),
+            }
+            details = get_item_details(args)
+            rate = details.get("price_list_rate") or details.get("rate") or 0
+            if rate > 0:
+                formatted_price = fmt_money(rate, currency=details.get("currency"))
+        except:
+            pass
+
         result.append({
             "item_code": item.name,
             "item_name": item.item_name or item.name,
             "description": (item.get("description") or "").strip(),
             "image_url": image_url,
+            "price": rate,
+            "formatted_price": formatted_price,
         })
     return result
 
@@ -222,7 +261,32 @@ def liff_submit_order(access_token=None, items=None, note=None):
         so.insert(ignore_permissions=True)
         so.submit()
 
-        total_text = fmt_money(so.grand_total, currency=so.currency)
+            "grand_total": so.grand_total,
+            "grand_total_formatted": total_text,
+            "currency": so.currency,
+        }
+        
+        # Send confirmation via LINE
+        try:
+            msg_lines = [
+                f"สั่งซื้อสำเร็จ! {so.name}",
+                f"รายการสินค้า {len(orders)} รายการ",
+            ]
+            for o in orders:
+                msg_lines.append(f"- {o['title']} x {format_qty(o['qty'])}")
+            
+            msg_lines.append(f"ยอดรวม: {total_text}")
+            msg_lines.append(f"รอรับสินค้าวันที่: {so.delivery_date}")
+            msg_lines.append("ขอบคุณค่ะ 🙏")
+            
+            msg = "\n".join(msg_lines)
+            
+            # Send push message
+            from line_integration.utils.line_client import push_message
+            push_message(profile_doc.line_user_id, msg)
+        except:
+            frappe.log_error(frappe.get_traceback(), "LIFF Confirmation Push Failed")
+
         return {
             "success": True,
             "sales_order": so.name,
