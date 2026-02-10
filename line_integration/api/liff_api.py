@@ -103,10 +103,10 @@ def _get_liff_user(access_token):
 # ──────────────────────────────────────────────
 
 @frappe.whitelist(allow_guest=True)
-def liff_options(*args, **kwargs):
-    """Specific hook for OPTIONS preflight checks."""
+def liff_debug():
+    """Simple ping to check if code is updated."""
     set_cors_headers()
-    return {}
+    return {"status": "ok", "version": "2026-02-10-v2"}
 
 @frappe.whitelist(allow_guest=True)
 def liff_auth(access_token=None):

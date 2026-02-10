@@ -46,6 +46,16 @@ async function init() {
     }
 
     const accessToken = liff.getAccessToken();
+    
+    // Debug Ping
+    try {
+        console.log('Pinging backend...');
+        await axios.get(`${API_BASE}.liff_debug`);
+        console.log('Backend connected!');
+    } catch (e) {
+        console.warn('Backend debug ping failed:', e);
+    }
+
     await authenticate(accessToken);
     setupNavigation();
     showPage('home');
