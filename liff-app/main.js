@@ -183,17 +183,27 @@ async function renderMenu() {
   contentEl.innerHTML = '<div class="loader-container"><div class="loader"></div><p>กำลังโหลดเมนู...</p></div>';
   
   try {
-    const response = await axios.get(`${API_BASE}.liff_get_menu`);
+    const response = await axios.get(`${API_BASE}.liff_get_menu`, {
+        params: { access_token: liff.getAccessToken() }
+    });
     menuItems = response.data.message;
     
     let html = '<div class="menu-grid">';
     menuItems.forEach(item => {
+      const priceHtml = item.formatted_price 
+        ? `<div class="price">${item.formatted_price}</div>` 
+        : '';
+        
       html += `
         <div class="item-card">
           <img src="${item.image_url || 'https://via.placeholder.com/200'}" class="item-image" />
           <div class="item-info">
             <div class="item-name">${item.item_name}</div>
-            <button class="add-btn" onclick="addToCart('${item.item_code}')">เพิ่มลงตะกร้า</button>
+            ${priceHtml}
+            <div class="action-row">
+                <input type="number" id="qty-${item.item_code}" class="qty-input" value="1" min="1" />
+                <button class="add-btn" onclick="addToCart('${item.item_code}')">ใส่ตะกร้า</button>
+            </div>
           </div>
         </div>
       `;
@@ -201,6 +211,7 @@ async function renderMenu() {
     html += '</div>';
     contentEl.innerHTML = html;
   } catch (err) {
+    console.error(err);
     contentEl.innerHTML = '<p class="error">ไม่สามารถโหลดเมนูได้ กรุณาลองใหม่อีกครั้ง</p>';
   }
 }
@@ -209,13 +220,16 @@ window.addToCart = (itemCode) => {
   const item = menuItems.find(i => i.item_code === itemCode);
   if (!item) return;
   
+  const qtyInput = document.getElementById(`qty-${itemCode}`);
+  const qty = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+  
   const existing = cart.find(c => c.item_code === itemCode);
   if (existing) {
-    existing.qty += 1;
+    existing.qty += qty;
   } else {
-    cart.push({ ...item, qty: 1 });
+    cart.push({ ...item, qty: qty });
   }
-  alert(`เพิ่ม ${item.item_name} ลงตะกร้าแล้ว`);
+  alert(`เพิ่ม ${item.item_name} จำนวน ${qty} ลงตะกร้าแล้ว`);
 };
 
 function renderOrder() {
@@ -231,17 +245,31 @@ function renderOrder() {
   }
 
   let html = '<h2>ตะกร้าสินค้า</h2><div class="cart-items">';
+  let grandTotal = 0;
+  
   cart.forEach((item, index) => {
+    const itemTotal = (item.price || 0) * item.qty;
+    grandTotal += itemTotal;
+    const priceText = item.formatted_price ? `${item.formatted_price}/ชิ้น` : '';
+    
     html += `
       <div class="cart-item">
         <div class="cart-item-info">
           <div class="name">${item.item_name}</div>
+          <div class="price-detail">${priceText}</div>
           <div class="qty">จำนวน: ${item.qty}</div>
         </div>
         <button class="remove-btn" onclick="removeFromCart(${index})">ลบ</button>
       </div>
     `;
   });
+  
+  if (grandTotal > 0) {
+      // Simple format, formatting relying on backend is better usually but simple format here ok
+      const formattedTotal = grandTotal.toLocaleString('th-TH', { style: 'currency', currency: 'THB' });
+      html += `<div class="cart-total"><h3>ยอดรวมประมาณ: ${formattedTotal}</h3></div>`;
+  }
+  
   html += `</div>
     <div class="order-note">
       <textarea id="note" placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" class="input-field"></textarea>
