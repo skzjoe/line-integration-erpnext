@@ -311,7 +311,7 @@ function updateFloatingCart() {
     floatBtn.classList.remove('hidden');
 }
 
-function renderOrder() {
+async function renderOrder() {
   if (cart.length === 0) {
     contentEl.innerHTML = `
       <div class="empty-state">
@@ -323,12 +323,27 @@ function renderOrder() {
     return;
   }
 
-  let html = '<h2>ตะกร้าสินค้า</h2><div class="cart-items">';
-  let grandTotal = 0;
+  // Show loading state while calculating
+  contentEl.innerHTML = `
+    <h2>ตะกร้าสินค้า</h2>
+    <div class="loader-container">
+        <div class="loader"></div>
+        <p>กำลังคำนวณราคา...</p>
+    </div>
+  `;
+
+  const serverCart = await calculateCartBackend();
   
-  cart.forEach((item, index) => {
-    const itemTotal = (item.price || 0) * item.qty;
-    grandTotal += itemTotal;
+  // Use server cart if available, otherwise fallback to local calculation
+  const itemsToRender = serverCart ? serverCart.items : cart;
+  const grandTotal = serverCart ? serverCart.grand_total : cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+  const formattedTotal = serverCart ? serverCart.formatted_total : grandTotal.toLocaleString('th-TH', { style: 'currency', currency: 'THB' });
+
+  let html = '<h2>ตะกร้าสินค้า</h2><div class="cart-items">';
+  
+  itemsToRender.forEach((item, index) => {
+    // If it's the server cart, the index might not match exactly if we relied on index before.
+    // But since we pass the whole cart, it should be 1:1.
     const priceText = item.formatted_price ? `${item.formatted_price}/ชิ้น` : '';
     
     html += `
@@ -346,8 +361,6 @@ function renderOrder() {
       </div>
     `;
   });
-  
-  const formattedTotal = grandTotal.toLocaleString('th-TH', { style: 'currency', currency: 'THB' });
   
   if (grandTotal > 0) {
       html += `<div class="cart-total"><h3>ยอดรวม: ${formattedTotal}</h3></div>`;
