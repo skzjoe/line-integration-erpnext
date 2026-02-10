@@ -473,7 +473,8 @@ def liff_get_history(access_token=None):
         filters={"customer": profile_doc.customer},
         fields=["name", "status", "grand_total", "currency", "transaction_date"],
         order_by="transaction_date desc",
-        limit=10
+        limit=10,
+        ignore_permissions=True
     )
     
     for order in orders:
@@ -483,10 +484,14 @@ def liff_get_history(access_token=None):
         items = frappe.get_all(
             "Sales Order Item",
             filters={"parent": order.name},
-            fields=["item_name", "qty", "amount"]
+            fields=["item_name", "qty", "amount"],
+            ignore_permissions=True
         )
         for item in items:
-             item["formatted_qty"] = format_qty(item["qty"])
+             try:
+                 item["formatted_qty"] = format_qty(item["qty"])
+             except:
+                 item["formatted_qty"] = f"{item['qty']}"
              
         order["items"] = items
         
