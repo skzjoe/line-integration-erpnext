@@ -518,6 +518,7 @@ async function renderProfile() {
 
             const statusClass = order.status || 'Draft';
             const statusLabel = statusMap[order.status] || order.status;
+            const date = order.transaction_date || '';
 
             listHtml += `
                 <div class="history-card status-${statusClass}" onclick="toggleOrderDetails('${order.name}')">
