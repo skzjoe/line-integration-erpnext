@@ -478,6 +478,16 @@ def liff_get_history(access_token=None):
     
     for order in orders:
         order["formatted_total"] = fmt_money(order["grand_total"], currency=order["currency"])
-        # Add basic status color mapping for frontend if needed, or handle in JS
+        
+        # Fetch items
+        items = frappe.get_all(
+            "Sales Order Item",
+            filters={"parent": order.name},
+            fields=["item_name", "qty", "amount"]
+        )
+        for item in items:
+             item["formatted_qty"] = format_qty(item["qty"])
+             
+        order["items"] = items
         
     return orders

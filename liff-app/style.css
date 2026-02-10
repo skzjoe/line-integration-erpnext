@@ -215,15 +215,21 @@ main {
 
 .add-btn {
     width: 100%;
-    margin-top: 8px;
+    margin-top: 0;
     background: var(--primary);
     color: white;
     border: none;
-    padding: 8px;
+    padding: 12px;
     border-radius: 12px;
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.95rem;
+    font-weight: 700;
     box-shadow: 0 4px 6px rgba(136, 216, 176, 0.3);
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.add-btn:active {
+    transform: scale(0.98);
 }
 
 /* Buttons */
@@ -473,8 +479,8 @@ textarea.input-field {
 /* Quantity Stepper */
 .action-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 12px;
     margin-top: 15px;
     width: 100%;
 }
@@ -482,9 +488,11 @@ textarea.input-field {
 .qty-selector {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    width: 100%;
     gap: 12px;
     background: #f8fafc;
-    padding: 6px 12px;
+    padding: 8px 16px;
     border-radius: 16px;
     border: 1px solid #e2e8f0;
 }
