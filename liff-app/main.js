@@ -468,23 +468,33 @@ async function renderProfile() {
             return;
         }
         
-        let listHtml = '';
-        orders.forEach(order => {
-            const date = new Date(order.transaction_date).toLocaleDateString('th-TH', {
-                day: 'numeric', month: 'short', year: '2-digit'
-            });
-            const statusClass = order.status || 'Draft';
-            
+            let itemsHtml = '';
+            if (order.items && order.items.length > 0) {
+                itemsHtml = `<div class="history-items hidden" id="order-items-${order.name}">`;
+                order.items.forEach(item => {
+                    itemsHtml += `
+                        <div class="history-item-row">
+                            <span class="item-name">${item.item_name}</span>
+                            <span class="item-qty">x${item.formatted_qty}</span>
+                        </div>
+                    `;
+                });
+                itemsHtml += '</div>';
+            }
+
             listHtml += `
-                <div class="history-card status-${statusClass}">
-                    <div class="history-info">
-                        <h4>${order.name}</h4>
-                        <div class="history-date">${date}</div>
+                <div class="history-card status-${statusClass}" onclick="toggleOrderDetails('${order.name}')">
+                    <div class="history-card-header">
+                        <div class="history-info">
+                            <h4>${order.name}</h4>
+                            <div class="history-date">${date}</div>
+                        </div>
+                        <div class="history-status">
+                            <span class="status-badge ${statusClass}">${order.status}</span>
+                            <div class="history-total">${order.formatted_total}</div>
+                        </div>
                     </div>
-                    <div class="history-status">
-                        <span class="status-badge ${statusClass}">${order.status}</span>
-                        <div class="history-total">${order.formatted_total}</div>
-                    </div>
+                    ${itemsHtml}
                 </div>
             `;
         });
@@ -495,6 +505,13 @@ async function renderProfile() {
         document.getElementById('history-loading').innerHTML = '<p class="error">โหลดประวัติไม่สำเร็จ</p>';
     }
   }
+}
+
+function toggleOrderDetails(orderId) {
+    const el = document.getElementById(`order-items-${orderId}`);
+    if (el) {
+        el.classList.toggle('hidden');
+    }
 }
 
 async function register() {
