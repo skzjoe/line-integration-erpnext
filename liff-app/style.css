@@ -456,3 +456,55 @@ textarea.input-field {
     justify-content: center;
     height: 200px;
 }
+
+/* Quantity Input Styles */
+.action-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.qty-input {
+    width: 60px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-card);
+    color: white;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 1rem;
+    outline: none;
+}
+
+.qty-input:focus {
+    border-color: var(--primary);
+}
+
+.price {
+    color: var(--primary);
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-bottom: 5px;
+}
+
+.price-detail {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.cart-total {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    text-align: right;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cart-total h3 {
+    margin: 0;
+    color: white;
+    font-size: 1.1rem;
+}
