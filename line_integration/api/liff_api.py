@@ -33,16 +33,12 @@ def set_cors_headers():
     if not origin:
         return
 
-    # Use a specific whitelist or just match the origin if it looks valid
-    # For now, we trust the origin if it matches our Render app pattern
-    if "onrender.com" in origin or origin == frappe.utils.get_url():
-        frappe.response["headers"] = {
-            "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Frappe-CSRF-Token",
-            "Access-Control-Allow-Credentials": "true",
-            "Vary": "Origin"
-        }
+    # Set headers directly using frappe.set_custom_header
+    frappe.set_custom_header("Access-Control-Allow-Origin", origin)
+    frappe.set_custom_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    frappe.set_custom_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Frappe-CSRF-Token, Cache-Control, Pragma, Origin, Accept")
+    frappe.set_custom_header("Access-Control-Allow-Credentials", "true")
+    frappe.set_custom_header("Vary", "Origin")
 
 # ──────────────────────────────────────────────
 #  Auth helpers
@@ -113,6 +109,9 @@ def liff_auth(access_token=None):
         return
 
     try:
+        if not access_token:
+            return {"success": False, "error": "Missing access_token"}
+
         profile_doc, user_info = _get_liff_user(access_token)
         customer_data = {}
         if profile_doc.customer:
@@ -135,9 +134,11 @@ def liff_auth(access_token=None):
         }
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "LIFF Auth Error")
+        # Ensure we return a 200 status with error info to avoid 417
+        frappe.local.response['http_status_code'] = 200
         return {
             "success": False,
-            "error": str(e)
+            "error": str(e) or "Verification failed"
         }
 
 
