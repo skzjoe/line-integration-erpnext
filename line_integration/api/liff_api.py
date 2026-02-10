@@ -270,7 +270,7 @@ def liff_submit_order(access_token=None, items=None, note=None):
             "customer": profile_doc.customer,
             "transaction_date": today(),
             "delivery_date": add_days(today(), days_until_sat),
-            "ignore_pricing_rule": 1,
+            "ignore_pricing_rule": 0,
             "remarks": note,
             "line_order_note": note,
             "items": build_so_items(orders, settings),
@@ -330,65 +330,51 @@ def liff_calculate_cart(access_token=None, items=None):
     except:
         pass
 
-    price_list = None
-    if not customer:
-        price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
-    
     currency = frappe.db.get_default("Currency") or "THB"
     company = frappe.db.get_default("Company")
+    settings = get_settings()
     
-    grand_total = 0.0
-    updated_items = []
+    # Simulate Sales Order
+    so = frappe.new_doc("Sales Order")
+    so.customer = customer
+    so.company = company
+    so.currency = currency
+    so.transaction_date = today()
+    so.delivery_date = add_days(today(), 7)
 
+    # Convert to build_so_items input
+    order_rows = []
     for item in items:
-        qty = flt(item.get("qty") or 1)
-        item_code = item.get("item_code")
-        
-        args = {
-            "item_code": item_code,
-            "qty": qty,
-            "customer": customer,
-            "price_list": price_list,
-            "company": company,
-            "transaction_date": today(),
-            "currency": currency
-        }
-        
-        rate = 0
-        try:
-            details = get_item_details(args)
-            rate = details.get("price_list_rate") or details.get("rate") or 0
-        except:
-            rate = 0
-            
-        # Fallback 1: Item Price (Standard Selling)
-        if rate <= 0:
-            rate = frappe.db.get_value("Item Price", 
-                {"item_code": item_code, "price_list": "Standard Selling"}, 
-                "price_list_rate"
-            ) or 0
-
-        # Fallback 2: Item Standard Rate
-        if rate <= 0:
-            doc = frappe.get_cached_doc("Item", item_code)
-            rate = flt(doc.standard_rate)
-
-        line_total = rate * qty
-        grand_total += line_total
-        
-        updated_item = item.copy()
-        updated_item.update({
-            "price": rate,
-            "formatted_price": fmt_money(rate, currency=currency),
-            "line_total": line_total,
-            "formatted_line_total": fmt_money(line_total, currency=currency)
+        order_rows.append({
+            "item_code": item.get("item_code"),
+            "qty": flt(item.get("qty") or 1)
         })
-        updated_items.append(updated_item)
+
+    # Add items using the custom build logic (which we will also refine)
+    for row in build_so_items(order_rows, settings):
+        so.append("items", row)
+    
+    # Trigger ERPNext Pricing Rules
+    so.set_missing_values()
+    so.calculate_taxes_and_totals()
+    
+    updated_items = []
+    for i, so_item in enumerate(so.items):
+        original = items[i] if i < len(items) else {}
+        updated_items.append({
+            "item_code": so_item.item_code,
+            "item_name": so_item.item_name or original.get("item_name"),
+            "qty": so_item.qty,
+            "price": so_item.rate,
+            "formatted_price": fmt_money(so_item.rate, currency=currency),
+            "line_total": so_item.amount,
+            "formatted_line_total": fmt_money(so_item.amount, currency=currency)
+        })
 
     return {
         "items": updated_items,
-        "grand_total": grand_total,
-        "formatted_total": fmt_money(grand_total, currency=currency)
+        "grand_total": so.grand_total,
+        "formatted_total": fmt_money(so.grand_total, currency=currency)
     }
 
 

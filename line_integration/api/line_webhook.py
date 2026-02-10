@@ -1129,10 +1129,14 @@ def build_so_items(orders, settings):
     for row in orders:
         qty = row.get("qty") or 0
         item_row = {"item_code": row.get("item_code"), "qty": qty}
+        
+        # Only force rate if the manual LIFF discount logic is active
+        # or if a manual regular price is explicitly set to override defaults.
         if apply_discount:
             item_row["rate"] = discount_price
         elif regular_price > 0:
             item_row["rate"] = regular_price
+            
         items.append(item_row)
     return items
 
