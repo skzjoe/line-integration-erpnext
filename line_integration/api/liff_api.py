@@ -24,6 +24,21 @@ from line_integration.api.line_webhook import (
 
 
 # ──────────────────────────────────────────────
+#  CORS helper
+# ──────────────────────────────────────────────
+
+def set_cors_headers():
+    """Manual CORS handling for Frappe Cloud environments."""
+    origin = frappe.get_request_header("Origin")
+    if origin:
+        frappe.response["headers"] = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Frappe-CSRF-Token",
+            "Access-Control-Allow-Credentials": "true"
+        }
+
+# ──────────────────────────────────────────────
 #  Auth helpers
 # ──────────────────────────────────────────────
 
@@ -87,21 +102,9 @@ def _get_liff_user(access_token):
 
 @frappe.whitelist(allow_guest=True)
 def liff_auth(access_token=None):
-    """Verify LIFF access token and return user profile + customer info.
-
-    POST /api/method/line_integration.line_integration.api.liff_api.liff_auth
-    Body: { "access_token": "<liff.getAccessToken()>" }
-
-    Returns:
-        {
-            "user_id": "U...",
-            "display_name": "...",
-            "picture_url": "...",
-            "is_registered": true/false,
-            "customer_name": "..." or null,
-            "phone": "..." or null
-        }
-    """
+    set_cors_headers()
+    if frappe.request.method == "OPTIONS":
+        return
     profile_doc, user_info = _get_liff_user(access_token)
 
     customer_data = {}
@@ -130,13 +133,9 @@ def liff_auth(access_token=None):
 
 @frappe.whitelist(allow_guest=True)
 def liff_get_menu():
-    """Return menu items for LIFF display.
-
-    GET /api/method/line_integration.line_integration.api.liff_api.liff_get_menu
-
-    Returns list of items:
-        [{ "item_code": "...", "item_name": "...", "description": "...", "image_url": "..." }, ...]
-    """
+    set_cors_headers()
+    if frappe.request.method == "OPTIONS":
+        return
     items = fetch_menu_items(limit=50)
     result = []
     for item in items:
@@ -158,15 +157,9 @@ def liff_get_menu():
 
 @frappe.whitelist(allow_guest=True)
 def liff_submit_order(access_token=None, items=None, note=None):
-    """Create a Sales Order from the LIFF frontend.
-
-    POST /api/method/line_integration.line_integration.api.liff_api.liff_submit_order
-    Body: {
-        "access_token": "<token>",
-        "items": [{"item_code": "...", "qty": 2}, ...],
-        "note": "optional note"
-    }
-    """
+    set_cors_headers()
+    if frappe.request.method == "OPTIONS":
+        return
     profile_doc, user_info = _get_liff_user(access_token)
     settings = get_settings()
 
@@ -246,11 +239,9 @@ def liff_submit_order(access_token=None, items=None, note=None):
 
 @frappe.whitelist(allow_guest=True)
 def liff_register(access_token=None, phone=None):
-    """Register or link a customer by phone number.
-
-    POST /api/method/line_integration.line_integration.api.liff_api.liff_register
-    Body: { "access_token": "<token>", "phone": "0812345678" }
-    """
+    set_cors_headers()
+    if frappe.request.method == "OPTIONS":
+        return
     profile_doc, user_info = _get_liff_user(access_token)
 
     phone = (phone or "").strip()
@@ -364,11 +355,9 @@ def liff_register(access_token=None, phone=None):
 
 @frappe.whitelist(allow_guest=True)
 def liff_get_points(access_token=None):
-    """Return loyalty points balance for the authenticated LINE user.
-
-    POST /api/method/line_integration.line_integration.api.liff_api.liff_get_points
-    Body: { "access_token": "<token>" }
-    """
+    set_cors_headers()
+    if frappe.request.method == "OPTIONS":
+        return
     profile_doc, user_info = _get_liff_user(access_token)
 
     if not profile_doc.customer:

@@ -4,7 +4,7 @@ import axios from 'axios';
 // Configuration
 // In production, these should be env vars or fetched from config
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || 'PENDING';
-const ERPNEXT_URL = import.meta.env.VITE_ERPNEXT_URL || window.location.origin.replace('liff.', ''); 
+const ERPNEXT_URL = (import.meta.env.VITE_ERPNEXT_URL || window.location.origin.replace('liff.', '')).replace(/\/$/, ""); 
 const API_BASE = `${ERPNEXT_URL}/api/method/line_integration.line_integration.api.liff_api`;
 
 // State
