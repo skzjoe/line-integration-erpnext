@@ -29,16 +29,32 @@ from line_integration.api.line_webhook import (
 
 def set_cors_headers():
     """Manual CORS handling for Frappe Cloud environments."""
-    origin = frappe.get_request_header("Origin")
-    if not origin:
-        return
+    try:
+        origin = frappe.get_request_header("Origin")
+        if not origin:
+            return
 
-    # Set headers directly using frappe.set_custom_header
-    frappe.set_custom_header("Access-Control-Allow-Origin", origin)
-    frappe.set_custom_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    frappe.set_custom_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Frappe-CSRF-Token, Cache-Control, Pragma, Origin, Accept")
-    frappe.set_custom_header("Access-Control-Allow-Credentials", "true")
-    frappe.set_custom_header("Vary", "Origin")
+        # Try robust set_custom_header (Frappe v14+)
+        if hasattr(frappe, "set_custom_header"):
+            frappe.set_custom_header("Access-Control-Allow-Origin", origin)
+            frappe.set_custom_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            frappe.set_custom_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Frappe-CSRF-Token, Cache-Control, Pragma, Origin, Accept")
+            frappe.set_custom_header("Access-Control-Allow-Credentials", "true")
+            frappe.set_custom_header("Vary", "Origin")
+        else:
+            # Fallback for older Frappe versions
+            if not frappe.response.get("headers"):
+                frappe.response["headers"] = {}
+            frappe.response["headers"].update({
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Frappe-CSRF-Token, Cache-Control, Pragma, Origin, Accept",
+                "Access-Control-Allow-Credentials": "true",
+                "Vary": "Origin"
+            })
+    except Exception:
+        # Prevent 500 if CORS setting fails
+        pass
 
 # ──────────────────────────────────────────────
 #  Auth helpers
