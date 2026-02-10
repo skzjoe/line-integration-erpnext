@@ -497,6 +497,8 @@ async function renderProfile() {
                     ${itemsHtml}
                 </div>
             `;
+                </div>
+            `;
         });
         historyList.innerHTML = listHtml;
         

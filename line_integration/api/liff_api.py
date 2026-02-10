@@ -473,7 +473,7 @@ def liff_get_history(access_token=None):
         filters={"customer": profile_doc.customer},
         fields=["name", "status", "grand_total", "currency", "transaction_date"],
         order_by="transaction_date desc",
-        limit=20
+        limit=10
     )
     
     for order in orders:
