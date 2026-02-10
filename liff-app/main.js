@@ -138,6 +138,27 @@ function setupNavigation() {
       showPage(btn.dataset.page);
     });
   });
+  updateCartBadge();
+}
+
+function updateCartBadge() {
+  const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+  const badgeEl = document.getElementById('cart-badge');
+  
+  // Find cart nav item
+  const cartNav = document.querySelector('[data-page="order"]');
+  if (cartNav) {
+      // Remove existing badge if any
+      const existingBadge = cartNav.querySelector('.cart-badge');
+      if (existingBadge) existingBadge.remove();
+      
+      if (totalQty > 0) {
+          const badge = document.createElement('span');
+          badge.className = 'cart-badge';
+          badge.textContent = totalQty > 99 ? '99+' : totalQty;
+          cartNav.appendChild(badge);
+      }
+  }
 }
 
 function showPage(pageId) {
@@ -201,7 +222,11 @@ async function renderMenu() {
             <div class="item-name">${item.item_name}</div>
             ${priceHtml}
             <div class="action-row">
-                <input type="number" id="qty-${item.item_code}" class="qty-input" value="1" min="1" />
+                <div class="qty-selector">
+                    <button class="qty-btn" onclick="adjustMenuQty('${item.item_code}', -1)">-</button>
+                    <span id="qty-${item.item_code}" class="qty-display">1</span>
+                    <button class="qty-btn" onclick="adjustMenuQty('${item.item_code}', 1)">+</button>
+                </div>
                 <button class="add-btn" onclick="addToCart('${item.item_code}')">ใส่ตะกร้า</button>
             </div>
           </div>
@@ -216,12 +241,22 @@ async function renderMenu() {
   }
 }
 
+window.adjustMenuQty = (itemCode, delta) => {
+    const qtyEl = document.getElementById(`qty-${itemCode}`);
+    if (qtyEl) {
+        let current = parseInt(qtyEl.textContent) || 1;
+        current += delta;
+        if (current < 1) current = 1;
+        qtyEl.textContent = current;
+    }
+};
+
 window.addToCart = (itemCode) => {
   const item = menuItems.find(i => i.item_code === itemCode);
   if (!item) return;
   
-  const qtyInput = document.getElementById(`qty-${itemCode}`);
-  const qty = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+  const qtyEl = document.getElementById(`qty-${itemCode}`);
+  const qty = parseInt(qtyEl ? qtyEl.textContent : 1) || 1;
   
   const existing = cart.find(c => c.item_code === itemCode);
   if (existing) {
@@ -229,7 +264,20 @@ window.addToCart = (itemCode) => {
   } else {
     cart.push({ ...item, qty: qty });
   }
-  alert(`เพิ่ม ${item.item_name} จำนวน ${qty} ลงตะกร้าแล้ว`);
+  
+  // Update badge immediately
+  updateCartBadge();
+  
+  // Optional: Reset menu qty to 1
+  if (qtyEl) qtyEl.textContent = '1';
+  
+  liff.sendMessages([{
+      type: 'text',
+      text: `เพิ่ม ${item.item_name} จำนวน ${qty} ชิ้น ลงตะกร้าแล้ว`
+  }]).catch(() => {
+      // Fallback if sendMessages fails (e.g. not opened from LINE)
+      alert(`เพิ่ม ${item.item_name} จำนวน ${qty} ลงตะกร้าแล้ว`);
+  });
 };
 
 function renderOrder() {
@@ -253,37 +301,51 @@ function renderOrder() {
     const priceText = item.formatted_price ? `${item.formatted_price}/ชิ้น` : '';
     
     html += `
+    html += `
       <div class="cart-item">
         <div class="cart-item-info">
           <div class="name">${item.item_name}</div>
           <div class="price-detail">${priceText}</div>
-          <div class="qty">จำนวน: ${item.qty}</div>
         </div>
-        <button class="remove-btn" onclick="removeFromCart(${index})">ลบ</button>
+        <div class="qty-selector">
+            <button class="qty-btn" onclick="adjustCartQty(${index}, -1)">-</button>
+            <span class="qty-display">${item.qty}</span>
+            <button class="qty-btn" onclick="adjustCartQty(${index}, 1)">+</button>
+        </div>
+        <button class="remove-btn" onclick="removeFromCart(${index})" style="margin-left: 10px;">x</button>
       </div>
     `;
   });
   
+  const formattedTotal = grandTotal.toLocaleString('th-TH', { style: 'currency', currency: 'THB' });
+  
   if (grandTotal > 0) {
-      // Simple format, formatting relying on backend is better usually but simple format here ok
-      const formattedTotal = grandTotal.toLocaleString('th-TH', { style: 'currency', currency: 'THB' });
-      html += `<div class="cart-total"><h3>ยอดรวมประมาณ: ${formattedTotal}</h3></div>`;
+      html += `<div class="cart-total"><h3>ยอดรวม: ${formattedTotal}</h3></div>`;
   }
   
   html += `</div>
     <div class="order-note">
       <textarea id="note" placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" class="input-field"></textarea>
     </div>
-    <button class="btn btn-primary" id="submit-order-btn">สั่งออเดอร์เลย</button>
+    <button class="btn btn-primary" id="submit-order-btn">สั่งออเดอร์ (${formattedTotal})</button>
   `;
   contentEl.innerHTML = html;
   
   document.getElementById('submit-order-btn').onclick = submitOrder;
+  updateCartBadge();
 }
+
+window.adjustCartQty = (index, delta) => {
+    cart[index].qty += delta;
+    if (cart[index].qty < 1) cart[index].qty = 1;
+    renderOrder();
+    updateCartBadge();
+};
 
 window.removeFromCart = (index) => {
   cart.splice(index, 1);
   renderOrder();
+  updateCartBadge();
 };
 
 async function submitOrder() {
