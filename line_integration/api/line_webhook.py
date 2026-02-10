@@ -1040,7 +1040,7 @@ def fetch_menu_items(limit=10, order_by="item_name asc"):
     return frappe.get_all(
         "Item",
         filters={"custom_add_in_line_menu": 1},
-        fields=["name", "item_name", "description", "custom_line_menu_image"],
+        fields=["name", "item_name", "description", "custom_line_menu_image", "standard_rate"],
         order_by=order_by,
         limit=limit,
     )

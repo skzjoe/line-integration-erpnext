@@ -346,6 +346,33 @@ main {
     color: var(--primary);
 }
 
+/* Nav Badge */
+.nav-item {
+    position: relative;
+    overflow: visible;
+}
+
+.cart-badge {
+    position: absolute;
+    top: 5px;
+    right: 25%;
+    background: #ef4444;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 800;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    transform: translate(50%, -50%);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+}
+
 .action-card h3 {
     margin: 0;
     font-size: 1.1rem;
