@@ -552,7 +552,7 @@ def liff_get_history(access_token=None):
             "status": ["!=", "Draft"]
         },
         fields=["name", "status", "grand_total", "currency", "transaction_date"],
-        order_by="transaction_date desc",
+        order_by="transaction_date desc, creation desc",
         limit=10,
         ignore_permissions=True
     )
